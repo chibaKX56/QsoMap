@@ -168,13 +168,12 @@
   </table>
 </div>
 
-<!-- 1. まず地図とボタンを確実に動かす通常スクリプト -->
 <script src="https://unpkg.com"></script>
 <script>
   window.onerror = function(msg, url, line) {
     const box = document.getElementById('error-box');
     box.style.display = 'block';
-    box.innerHTML = '<b>⚠️ コード記述エラー（' + line + '行目）:</b><br>' + msg + '<br>※Firebase設定を貼り付けた際に、カンマやカッコが消えていないか確認してください。';
+    box.innerHTML = '<b>⚠️ コード記述エラー（' + line + '行目）:</b><br>' + msg;
     document.getElementById('sys-status').textContent = 'コードエラー停止';
   };
 
@@ -195,23 +194,22 @@
   document.getElementById('sys-status').textContent = '地図表示完了（Firebase接続待ち）';
 </script>
 
-<!-- 2. Firebase設定エリア（★ここだけを書き換えてください） -->
+<!-- ========================================================= -->
+<!-- ★Firebase設定エリア（"" の中身だけを書き換えてください）     -->
+<!-- ========================================================= -->
 <script>
-  // ★ここから下にFirebaseの const firebaseConfig = { ... }; を丸ごと貼り付けて上書きしてください
   const firebaseConfig = {
-  apiKey: "AIzaSyCNfdXz9KhPsFDVMwsfyk-3JtDQjUo-cRs",
-  authDomain: "communication-map-b30e3.firebaseapp.com",
-  databaseURL: "https://communication-map-b30e3-default-rtdb.firebaseio.com",
-  projectId: "communication-map-b30e3",
-  storageBucket: "communication-map-b30e3.firebasestorage.app",
-  messagingSenderId: "942567738907",
-  appId: "1:942567738907:web:702678d0071795878132be",
-  measurementId: "G-7C3JNN1FYN"
-};
-  // ★ここまで
+    apiKey: "AIzaSyCNfdXz9KhPsFDVMwsfyk-3JtDQjUo-cRs",
+    authDomain: "communication-map-b30e3.firebaseapp.com",
+    databaseURL: "https://communication-map-b30e3-default-rtdb.firebaseio.com",
+    projectId: "communication-map-b30e3",
+    storageBucket: "communication-map-b30e3.firebasestorage.app",
+    messagingSenderId: "942567738907",
+    appId: "1:942567738907:web:702678d0071795878132be"
+  };
 </script>
+<!-- ========================================================= -->
 
-<!-- 3. Firebase通信処理 -->
 <script type="module">
   import { initializeApp } from "https://gstatic.com";
   import { getDatabase, ref, set, push, onValue } from "https://gstatic.com";
@@ -225,10 +223,10 @@
 
   let db = null;
   try {
-    if (typeof firebaseConfig === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
-      showError("Firebaseの設定値（firebaseConfig）がまだ貼り付けられていません。");
-    } else if (!firebaseConfig.databaseURL) {
-      showError("firebaseConfig の中に <b>databaseURL</b> がありません。Realtime Database のURLを追記してください。");
+    if (firebaseConfig.apiKey.includes("★ここに")) {
+      showError("Firebaseの設定値（★ここに〜）がまだ書き換えられていません。");
+    } else if (firebaseConfig.databaseURL.includes("★ここに") || !firebaseConfig.databaseURL.startsWith("https://")) {
+      showError("databaseURL が正しくありません。「https://〇〇.firebaseio.com」または「https://〇〇.firebasedatabase.app」のURLを入れてください。");
     } else {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
