@@ -198,7 +198,7 @@
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   document.getElementById('log-time').value = now.toISOString().slice(0, 16);
 
-  // ブラウザに自局コールサインを記憶させて入力の手間を省く
+  // ブラウザに自局コールサインを記憶
   const savedCall = localStorage.getItem('my_qso_callsign');
   if (savedCall) {
     document.getElementById('reg-call').value = savedCall;
@@ -219,7 +219,7 @@
       return;
     }
     const parts = coordStr.split(',').map(s => parseFloat(s.trim()));
-    if (parts.length !== 2 || isNaN(parts) || isNaN(parts)) {
+    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
       alert('座標は「35.3606, 138.7274」の形式で入力してください。');
       return;
     }
@@ -227,15 +227,18 @@
     localStorage.setItem('my_qso_callsign', rawCall);
     document.getElementById('log-my-call').value = rawCall;
 
-    await set(ref(db, 'stations/' + encodeCall(rawCall)), {
-      callsign: rawCall,
-      place: place,
-      lat: parts,
-      lon: parts,
-      updatedAt: Date.now()
-    });
-
-    alert(`${rawCall} の運用場所（${place}）を登録しました。`);
+    try {
+      await set(ref(db, 'stations/' + encodeCall(rawCall)), {
+        callsign: rawCall,
+        place: place,
+        lat: parts[0],
+        lon: parts[1],
+        updatedAt: Date.now()
+      });
+      alert(`${rawCall} の運用場所（${place}）を登録しました。`);
+    } catch (e) {
+      alert('保存エラー: Firebaseの設定またはデータベースのルールを確認してください。\n' + e.message);
+    }
   };
 
   // ② 交信相手の報告処理
@@ -255,15 +258,18 @@
 
     localStorage.setItem('my_qso_callsign', myCall);
 
-    await push(ref(db, 'qso_logs'), {
-      from: myCall,
-      to: targetCall,
-      time: timeVal.replace('T', ' '),
-      createdAt: Date.now()
-    });
-
-    document.getElementById('log-target-call').value = '';
-    alert(`${targetCall} との交信を送信しました。相手局の入力と一致するとラインが引かれます。`);
+    try {
+      await push(ref(db, 'qso_logs'), {
+        from: myCall,
+        to: targetCall,
+        time: timeVal.replace('T', ' '),
+        createdAt: Date.now()
+      });
+      document.getElementById('log-target-call').value = '';
+      alert(`${targetCall} との交信を送信しました。相手局の入力と一致するとラインが引かれます。`);
+    } catch (e) {
+      alert('送信エラー: Firebaseの設定を確認してください。\n' + e.message);
+    }
   };
 
   // 2点間の距離計算 (km)
@@ -295,7 +301,6 @@
     const stationMap = {};
     Object.values(stationsData).forEach(st => {
       stationMap[st.callsign] = st;
-      // 登録局のピンを地図に表示
       L.marker([st.lat, st.lon])
         .bindPopup(`<b>${st.callsign}</b><br>運用地: ${st.place}`)
         .addTo(layerGroup);
@@ -306,7 +311,6 @@
     const logs = Object.values(logsData);
     const matchedPairs = new Map();
 
-    // 相互一致（A→B と B→A の両方が存在するか）をチェック
     logs.forEach(logA => {
       const logB = logs.find(item => item.from === logA.to && item.to === logA.from);
       if (logB) {
@@ -325,12 +329,7 @@
       const stA = stationMap[logA.from];
       const stB = stationMap[logB.from];
 
-      // 双方の運用場所が登録済みの場合にラインを描画
       if (stA && stB) {
         lineCount++;
         const dist = calcDistance(stA.lat, stA.lon, stB.lat, stB.lon);
 
-        const polyline = L.polyline([[stA.lat, stA.lon], [stB.lat, stB.lon]], {
-          color: '#e11d48',
-          weight: 4,
-          opacity: 0.85
