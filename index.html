@@ -79,6 +79,15 @@
       font-weight: bold;
       color: #0369a1;
     }
+    .error-box {
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      display: none;
+    }
     table.match-table {
       width: 100%;
       border-collapse: collapse;
@@ -97,6 +106,9 @@
 <body>
 
 <div class="qso-app">
+  <!-- エラー通知表示エリア -->
+  <div id="error-box" class="error-box"></div>
+
   <div class="panel-grid">
     <!-- 1. 自局の運用場所登録 -->
     <div class="card">
@@ -113,7 +125,7 @@
         <label>運用場所の座標 (緯度, 経度) *</label>
         <input type="text" id="reg-coord" placeholder="例: 35.3606, 138.7274">
       </div>
-      <button type="button" class="btn btn-station" onclick="registerStation()">自局の運用場所を登録・更新</button>
+      <button type="button" id="btn-reg" class="btn btn-station">自局の運用場所を登録・更新</button>
     </div>
 
     <!-- 2. 交信相手の報告 -->
@@ -131,13 +143,13 @@
         <label>交信時間 *</label>
         <input type="datetime-local" id="log-time">
       </div>
-      <button type="button" class="btn btn-qso" onclick="submitQSO()">交信ログを送信する</button>
+      <button type="button" id="btn-qso" class="btn btn-qso">交信ログを送信する</button>
     </div>
   </div>
 
   <!-- ステータス表示 -->
   <div class="status-bar" id="status-bar">
-    登録局数: <span id="stat-stations">0</span>局 ｜ 成立（相互一致）ライン数: <span id="stat-matches">0</span>本
+    システム状態: <span id="sys-status">初期化中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
   </div>
 
   <!-- 地図エリア -->
@@ -168,6 +180,13 @@
   import { initializeApp } from "https://gstatic.com";
   import { getDatabase, ref, set, push, onValue } from "https://gstatic.com";
 
+  const showError = (msg) => {
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.innerHTML = '<b>⚠️ エラー詳細:</b> ' + msg;
+    document.getElementById('sys-status').textContent = '設定エラー';
+  };
+
   // =========================================================
   // ★ここにFirebaseコンソールで取得した設定を貼り付けてください
   // =========================================================
@@ -183,10 +202,7 @@
 };
   // =========================================================
 
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  // 地図初期化
+  // 地図初期化（Firebaseより先に動かして地図を確実に表示）
   const map = L.map('map').setView([36.2048, 138.2529], 6);
   L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
     attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
@@ -198,18 +214,38 @@
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   document.getElementById('log-time').value = now.toISOString().slice(0, 16);
 
-  // ブラウザに自局コールサインを記憶
+  // ブラウザ記憶の復元
   const savedCall = localStorage.getItem('my_qso_callsign');
   if (savedCall) {
     document.getElementById('reg-call').value = savedCall;
     document.getElementById('log-my-call').value = savedCall;
   }
 
-  // Firebaseキー用にコールサインの「/」を「_」に変換
+  // Firebase接続初期化
+  let db = null;
+  try {
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+      showError("コード内の firebaseConfig が初期値（YOUR_API_KEY）のままです。Firebaseの設定値に書き換えてください。");
+    } else if (!firebaseConfig.databaseURL) {
+      showError("firebaseConfig に databaseURL が含まれていません。Realtime Database のURLを追加してください。");
+    } else {
+      const app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      document.getElementById('sys-status').textContent = 'オンライン接続完了';
+    }
+  } catch (err) {
+    showError("Firebaseの初期化に失敗しました: " + err.message);
+  }
+
   const encodeCall = (call) => call.trim().toUpperCase().replace(/\//g, '_');
 
   // ① 自局の運用場所登録処理
-  window.registerStation = async function() {
+  document.getElementById('btn-reg').addEventListener('click', async () => {
+    if (!db) {
+      alert('Firebaseが正しく接続されていないため保存できません。画面上部の赤枠のエラーを確認してください。');
+      return;
+    }
+
     const rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
     const place = document.getElementById('reg-place').value.trim();
     const coordStr = document.getElementById('reg-coord').value.trim();
@@ -218,9 +254,13 @@
       alert('コールサイン、運用場所、座標をすべて入力してください。');
       return;
     }
-    const parts = coordStr.split(',').map(s => parseFloat(s.trim()));
-    if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-      alert('座標は「35.3606, 138.7274」の形式で入力してください。');
+
+    const parts = coordStr.split(',');
+    const lat = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
+    const lon = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
+
+    if (isNaN(lat) || isNaN(lon)) {
+      alert('座標は「35.3606, 138.7274」のように半角数字とカンマで入力してください。');
       return;
     }
 
@@ -231,18 +271,23 @@
       await set(ref(db, 'stations/' + encodeCall(rawCall)), {
         callsign: rawCall,
         place: place,
-        lat: parts[0],
-        lon: parts[1],
+        lat: lat,
+        lon: lon,
         updatedAt: Date.now()
       });
-      alert(`${rawCall} の運用場所（${place}）を登録しました。`);
+      alert(`${rawCall} の運用場所（${place}）を登録しました！`);
     } catch (e) {
-      alert('保存エラー: Firebaseの設定またはデータベースのルールを確認してください。\n' + e.message);
+      showError('データベース書き込み拒否: Firebaseの「Realtime Database > ルール」で .write が true になっているか確認してください。(' + e.message + ')');
     }
-  };
+  });
 
   // ② 交信相手の報告処理
-  window.submitQSO = async function() {
+  document.getElementById('btn-qso').addEventListener('click', async () => {
+    if (!db) {
+      alert('Firebaseが正しく接続されていないため送信できません。');
+      return;
+    }
+
     const myCall = document.getElementById('log-my-call').value.trim().toUpperCase();
     const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
     const timeVal = document.getElementById('log-time').value;
@@ -266,11 +311,11 @@
         createdAt: Date.now()
       });
       document.getElementById('log-target-call').value = '';
-      alert(`${targetCall} との交信を送信しました。相手局の入力と一致するとラインが引かれます。`);
+      alert(`${targetCall} との交信を送信しました。`);
     } catch (e) {
-      alert('送信エラー: Firebaseの設定を確認してください。\n' + e.message);
+      showError('送信エラー: ' + e.message);
     }
-  };
+  });
 
   // 2点間の距離計算 (km)
   function calcDistance(lat1, lon1, lat2, lon2) {
@@ -282,54 +327,8 @@
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
   }
 
-  // リアルタイムデータ監視＆マッチング描画
   let stationsData = {};
   let logsData = {};
 
-  onValue(ref(db, 'stations'), (snapshot) => {
-    stationsData = snapshot.val() || {};
-    renderAll();
-  });
-
-  onValue(ref(db, 'qso_logs'), (snapshot) => {
-    logsData = snapshot.val() || {};
-    renderAll();
-  });
-
-  function renderAll() {
-    layerGroup.clearLayers();
-    const stationMap = {};
-    Object.values(stationsData).forEach(st => {
-      stationMap[st.callsign] = st;
-      L.marker([st.lat, st.lon])
-        .bindPopup(`<b>${st.callsign}</b><br>運用地: ${st.place}`)
-        .addTo(layerGroup);
-    });
-
-    document.getElementById('stat-stations').textContent = Object.keys(stationMap).length;
-
-    const logs = Object.values(logsData);
-    const matchedPairs = new Map();
-
-    logs.forEach(logA => {
-      const logB = logs.find(item => item.from === logA.to && item.to === logA.from);
-      if (logB) {
-        const pairKey = [logA.from, logA.to].sort().join('__');
-        if (!matchedPairs.has(pairKey)) {
-          matchedPairs.set(pairKey, { logA, logB });
-        }
-      }
-    });
-
-    const tbody = document.getElementById('match-tbody');
-    tbody.innerHTML = '';
-    let lineCount = 0;
-
-    matchedPairs.forEach(({ logA, logB }) => {
-      const stA = stationMap[logA.from];
-      const stB = stationMap[logB.from];
-
-      if (stA && stB) {
-        lineCount++;
-        const dist = calcDistance(stA.lat, stA.lon, stB.lat, stB.lon);
-
+  if (db) {
+    onValue(ref(db, 'stations'), (snapshot) => {
