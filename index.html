@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>リアルタイム無線交信（QSO）マッチングマップ</title>
-  <link rel="stylesheet" href="https://unpkg.com" />
+  <!-- 安定したCDN（jsDelivr）からLeafletを読み込み -->
+  <link rel="stylesheet" href="https://jsdelivr.net" />
+  <script src="https://jsdelivr.net"></script>
   <style>
     .qso-app {
       max-width: 960px;
@@ -147,7 +149,7 @@
   </div>
 
   <div class="status-bar" id="status-bar">
-    システム状態: <span id="sys-status">プログラム起動中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
+    システム状態: <span id="sys-status">読み込み中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
   </div>
 
   <div id="map"></div>
@@ -167,32 +169,6 @@
     </tbody>
   </table>
 </div>
-
-<script src="https://unpkg.com"></script>
-<script>
-  window.onerror = function(msg, url, line) {
-    const box = document.getElementById('error-box');
-    box.style.display = 'block';
-    box.innerHTML = '<b>⚠️ コード記述エラー（' + line + '行目）:</b><br>' + msg;
-    document.getElementById('sys-status').textContent = 'コードエラー停止';
-  };
-
-  window.map = L.map('map').setView([36.2048, 138.2529], 6);
-  L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
-    attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
-  }).addTo(window.map);
-  window.layerGroup = L.layerGroup().addTo(window.map);
-
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('log-time').value = now.toISOString().slice(0, 16);
-
-  const savedCall = localStorage.getItem('my_qso_callsign');
-  if (savedCall) {
-    document.getElementById('reg-call').value = savedCall;
-  }
-  document.getElementById('sys-status').textContent = '地図表示完了（Firebase接続待ち）';
-</script>
 
 <!-- ========================================================= -->
 <!-- ★Firebase設定エリア（"" の中身だけを書き換えてください）     -->
@@ -218,112 +194,137 @@
   const showError = (msg) => {
     const box = document.getElementById('error-box');
     box.style.display = 'block';
-    box.innerHTML = '<b>⚠️ Firebaseエラー:</b><br>' + msg;
-    document.getElementById('sys-status').textContent = '接続エラー';
+    box.innerHTML = '<b>⚠️ エラー詳細:</b><br>' + msg;
+    document.getElementById('sys-status').textContent = '停止中';
   };
 
-  let db = null;
-  try {
-    if (firebaseConfig.apiKey.includes("★ここに")) {
-      showError("Firebaseの設定値（★ここに〜）がまだ書き換えられていません。");
-    } else if (firebaseConfig.databaseURL.includes("★ここに") || !firebaseConfig.databaseURL.startsWith("https://")) {
-      showError("databaseURL が正しくありません。「https://〇〇.firebaseio.com」または「https://〇〇.firebasedatabase.app」のURLを入れてください。");
-    } else {
-      const app = initializeApp(firebaseConfig);
-      db = getDatabase(app);
-      document.getElementById('sys-status').textContent = 'オンライン接続完了';
-    }
-  } catch (err) {
-    showError("Firebase初期化エラー: " + err.message);
-  }
+  window.onerror = function(msg, url, line) {
+    showError('プログラムエラー（' + line + '行目）: ' + msg);
+  };
 
-  const encodeCall = (call) => call.trim().toUpperCase().replace(/\//g, '_');
-
-  document.getElementById('btn-reg').addEventListener('click', async () => {
-    if (!db) {
-      alert('Firebaseが接続されていないため登録できません。画面上の赤いエラー内容を確認してください。');
+  function startApp() {
+    // 1. 地図ライブラリの読み込み確認
+    if (typeof L === 'undefined') {
+      showError('地図ライブラリ（Leaflet）の読み込みに失敗しました。インターネット接続や広告ブロッカーを確認してページを再読み込みしてください。');
       return;
     }
 
-    const rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
-    const place = document.getElementById('reg-place').value.trim();
-    const coordStr = document.getElementById('reg-coord').value.trim();
+    // 2. 地図の初期化
+    const map = L.map('map').setView([36.2048, 138.2529], 6);
+    L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
+      attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+    }).addTo(map);
+    const layerGroup = L.layerGroup().addTo(map);
 
-    if (!rawCall || !place || !coordStr) {
-      alert('コールサイン、運用場所、座標をすべて入力してください。');
-      return;
+    // 3. 初期値セット
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('log-time').value = now.toISOString().slice(0, 16);
+
+    const savedCall = localStorage.getItem('my_qso_callsign');
+    if (savedCall) {
+      document.getElementById('reg-call').value = savedCall;
     }
 
-    const parts = coordStr.split(',');
-    const lat = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
-    const lon = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
-
-    if (isNaN(lat) || isNaN(lon)) {
-      alert('座標は「35.3606, 138.7274」のように半角数字とカンマで入力してください。');
-      return;
-    }
-
-    localStorage.setItem('my_qso_callsign', rawCall);
-
+    // 4. Firebase接続初期化
+    let db = null;
     try {
-      await set(ref(db, 'stations/' + encodeCall(rawCall)), {
-        callsign: rawCall,
-        place: place,
-        lat: lat,
-        lon: lon,
-        updatedAt: Date.now()
-      });
-      alert(`${rawCall} の運用場所（${place}）を登録しました！`);
-    } catch (e) {
-      showError('保存が拒否されました。Firebaseの「Realtime Database > ルール」が true になっているか確認してください。(' + e.message + ')');
-    }
-  });
-
-  document.getElementById('btn-qso').addEventListener('click', async () => {
-    if (!db) {
-      alert('Firebaseが接続されていないため送信できません。');
-      return;
+      if (firebaseConfig.apiKey.includes("★ここに")) {
+        showError("Firebaseの設定値（★ここに〜）がまだ書き換えられていません。");
+      } else if (firebaseConfig.databaseURL.includes("★ここに") || !firebaseConfig.databaseURL.startsWith("https://")) {
+        showError("databaseURL が正しくありません。「https://〇〇.firebaseio.com」または「https://〇〇.firebasedatabase.app」のURLを入れてください。");
+      } else {
+        const app = initializeApp(firebaseConfig);
+        db = getDatabase(app);
+        document.getElementById('sys-status').textContent = 'オンライン接続完了';
+      }
+    } catch (err) {
+      showError("Firebase初期化エラー: " + err.message);
     }
 
-    const myCall = document.getElementById('reg-call').value.trim().toUpperCase();
-    const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
-    const timeVal = document.getElementById('log-time').value;
+    const encodeCall = (call) => call.trim().toUpperCase().replace(/\//g, '_');
 
-    if (!myCall) {
-      alert('先に左側の「① 自局コールサイン」を入力してください。');
-      return;
-    }
-    if (!targetCall || !timeVal) {
-      alert('相手局コールサインと交信時間を入力してください。');
-      return;
-    }
-    if (myCall === targetCall) {
-      alert('自局と相手局に同じコールサインは指定できません。');
-      return;
-    }
+    // ① 自局登録ボタン
+    document.getElementById('btn-reg').addEventListener('click', async () => {
+      if (!db) {
+        alert('Firebaseが接続されていないため登録できません。画面上の赤いエラー内容を確認してください。');
+        return;
+      }
 
-    localStorage.setItem('my_qso_callsign', myCall);
+      const rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
+      const place = document.getElementById('reg-place').value.trim();
+      const coordStr = document.getElementById('reg-coord').value.trim();
 
-    try {
-      await push(ref(db, 'qso_logs'), {
-        from: myCall,
-        to: targetCall,
-        time: timeVal.replace('T', ' '),
-        createdAt: Date.now()
-      });
-      document.getElementById('log-target-call').value = '';
-      alert(`${myCall} → ${targetCall} の交信を送信しました。`);
-    } catch (e) {
-      showError('送信エラー: ' + e.message);
-    }
-  });
+      if (!rawCall || !place || !coordStr) {
+        alert('コールサイン、運用場所、座標をすべて入力してください。');
+        return;
+      }
 
-  function calcDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const toRad = deg => deg * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
-  }
+      const parts = coordStr.split(',');
+      const lat = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
+      const lon = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
 
+      if (isNaN(lat) || isNaN(lon)) {
+        alert('座標は「35.3606, 138.7274」のように半角数字とカンマで入力してください。');
+        return;
+      }
+
+      localStorage.setItem('my_qso_callsign', rawCall);
+
+      try {
+        await set(ref(db, 'stations/' + encodeCall(rawCall)), {
+          callsign: rawCall,
+          place: place,
+          lat: lat,
+          lon: lon,
+          updatedAt: Date.now()
+        });
+        alert(`${rawCall} の運用場所（${place}）を登録しました！`);
+      } catch (e) {
+        showError('保存が拒否されました。Firebaseの「Realtime Database > ルール」が true になっているか確認してください。(' + e.message + ')');
+      }
+    });
+
+    // ② 交信報告ボタン
+    document.getElementById('btn-qso').addEventListener('click', async () => {
+      if (!db) {
+        alert('Firebaseが接続されていないため送信できません。');
+        return;
+      }
+
+      const myCall = document.getElementById('reg-call').value.trim().toUpperCase();
+      const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
+      const timeVal = document.getElementById('log-time').value;
+
+      if (!myCall) {
+        alert('先に左側の「① 自局コールサイン」を入力してください。');
+        return;
+      }
+      if (!targetCall || !timeVal) {
+        alert('相手局コールサインと交信時間を入力してください。');
+        return;
+      }
+      if (myCall === targetCall) {
+        alert('自局と相手局に同じコールサインは指定できません。');
+        return;
+      }
+
+      localStorage.setItem('my_qso_callsign', myCall);
+
+      try {
+        await push(ref(db, 'qso_logs'), {
+          from: myCall,
+          to: targetCall,
+          time: timeVal.replace('T', ' '),
+          createdAt: Date.now()
+        });
+        document.getElementById('log-target-call').value = '';
+        alert(`${myCall} → ${targetCall} の交信を送信しました。`);
+      } catch (e) {
+        showError('送信エラー: ' + e.message);
+      }
+    });
+
+    function calcDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = deg => deg * Math.PI / 180;
