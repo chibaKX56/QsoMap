@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>リアルタイム無線交信（QSO）マッチングマップ</title>
+<link rel="stylesheet" href="https://unpkg.com" />
 <link rel="stylesheet" href="leaflet.css" />
+<script src="https://unpkg.com"></script>
 <script src="leaflet.js"></script>
 <style>
   body { font-family: sans-serif; color: #333; max-width: 960px; margin: 0 auto; padding: 10px; }
@@ -18,9 +20,9 @@
   .btn-blue { background: #0284c7; }
   .btn-green { background: #16a34a; }
   .btn-gray { width: auto; padding: 5px 10px; background: #475569; font-size: 12px; }
-  #map { height: 480px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; }
+  #map { height: 480px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; background: #e2e8f0; }
   .bar { background: #e0f2fe; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #0369a1; display: flex; justify-content: space-between; align-items: center; }
-  .err { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; }
+  .err { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-size: 13px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
   th { background: #f1f5f9; }
@@ -66,8 +68,7 @@
 </table>
 
 <script>
-var GAS_URL = `https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec`;
-
+var GAS_URL = "https://google.com";
 var map = null;
 var layerGroup = null;
 
@@ -83,6 +84,8 @@ function init() {
     map = L.map("map").setView([36.2048, 138.2529], 6);
     L.tileLayer("https://gsi.go.jp{z}/{x}/{y}.png").addTo(map);
     layerGroup = L.layerGroup().addTo(map);
+  } else {
+    showErr("地図ライブラリ(Leaflet)の読み込みに失敗しました。");
   }
   var now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -93,30 +96,24 @@ function init() {
   setInterval(loadAllData, 10000);
 }
 
-function getCleanUrl() {
-  return GAS_URL.replace(/\s+/g, "");
-}
-
 function loadAllData() {
-  var url = getCleanUrl();
-  if (url.indexOf("https://google.com") !== 0) {
-    showErr("GAS_URL にウェブアプリのURL（https://google.com/.../exec）を貼り付けてください。");
-    return;
-  }
-  fetch(url + "?action=read")
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+  fetch(GAS_URL + "?action=read", { redirect: "follow" })
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTPエラー: " + r.status);
+      return r.text();
+    })
+    .then(function(txt) {
+      var data = JSON.parse(txt);
       document.getElementById("sys-status").textContent = "接続完了";
       document.getElementById("err-box").style.display = "none";
       render(data.stations || [], data.logs || []);
     })
     .catch(function(e) {
-      showErr("通信エラー: " + e.message + "（デプロイ時のアクセス権限が「全員」になっているか確認してください）");
+      showErr("通信・データ解析エラー: " + e.message + "<br>※Apps Scriptの「デプロイを管理＞新バージョンでデプロイ」を行ったか確認してください。");
     });
 }
 
 function handleReg() {
-  var url = getCleanUrl();
   var call = document.getElementById("reg-call").value.trim().toUpperCase();
   var place = document.getElementById("reg-place").value.trim();
   var coord = document.getElementById("reg-coord").value.trim();
@@ -139,8 +136,8 @@ function handleReg() {
               "&lat=" + encodeURIComponent(lat) +
               "&lon=" + encodeURIComponent(lon);
 
-  fetch(url + query)
-    .then(function(r) { return r.json(); })
+  fetch(GAS_URL + query, { redirect: "follow" })
+    .then(function(r) { return r.text(); })
     .then(function() {
       alert(call + " を登録しました！");
       loadAllData();
@@ -151,7 +148,6 @@ function handleReg() {
 }
 
 function handleQso() {
-  var url = getCleanUrl();
   var myCall = document.getElementById("reg-call").value.trim().toUpperCase();
   var tgCall = document.getElementById("log-target").value.trim().toUpperCase();
   var tm = document.getElementById("log-time").value;
@@ -174,8 +170,8 @@ function handleQso() {
               "&to=" + encodeURIComponent(tgCall) +
               "&time=" + encodeURIComponent(tm.replace("T", " "));
 
-  fetch(url + query)
-    .then(function(r) { return r.json(); })
+  fetch(GAS_URL + query, { redirect: "follow" })
+    .then(function(r) { return r.text(); })
     .then(function() {
       document.getElementById("log-target").value = "";
       alert(myCall + " → " + tgCall + " を送信しました！");
