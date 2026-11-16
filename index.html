@@ -7,114 +7,35 @@
   <link rel="stylesheet" href="leaflet.css" />
   <script src="leaflet.js"></script>
   <style>
-    .qso-app {
-      max-width: 960px;
-      margin: 0 auto;
-      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif;
-      color: #333;
-    }
-    .panel-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 15px;
-      margin-bottom: 15px;
-    }
-    .card {
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 15px;
-    }
-    .card h3 {
-      margin: 0 0 12px 0;
-      font-size: 16px;
-      color: #0f172a;
-      border-bottom: 2px solid #0284c7;
-      padding-bottom: 6px;
-    }
-    .form-group {
-      margin-bottom: 10px;
-    }
-    .form-group label {
-      display: block;
-      font-size: 12px;
-      font-weight: bold;
-      margin-bottom: 4px;
-      color: #475569;
-    }
-    .form-group input {
-      width: 100%;
-      padding: 8px;
-      box-sizing: border-box;
-      border: 1px solid #94a3b8;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .btn {
-      width: 100%;
-      padding: 10px;
-      border: none;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: bold;
-      color: #fff;
-      cursor: pointer;
-    }
+    .qso-app { max-width: 960px; margin: 0 auto; font-family: sans-serif; color: #333; }
+    .panel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; }
+    .card h3 { margin: 0 0 12px 0; font-size: 16px; color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 6px; }
+    .form-group { margin-bottom: 10px; }
+    .form-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #475569; }
+    .form-group input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #94a3b8; border-radius: 4px; font-size: 14px; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-size: 14px; font-weight: bold; color: #fff; cursor: pointer; }
     .btn-station { background: #0284c7; }
-    .btn-station:hover { background: #0369a1; }
     .btn-qso { background: #16a34a; }
-    .btn-qso:hover { background: #15803d; }
-    .btn-reload {
-      width: auto;
-      padding: 5px 12px;
-      background: #475569;
-      font-size: 12px;
-      margin-left: 10px;
-    }
-    #map {
-      height: 500px;
-      width: 100%;
-      border-radius: 8px;
-      border: 1px solid #94a3b8;
-      margin-bottom: 20px;
-    }
-    .status-bar {
-      background: #e0f2fe;
-      padding: 10px 15px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      font-size: 14px;
-      font-weight: bold;
-      color: #0369a1;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .error-box {
-      background: #fee2e2;
-      color: #b91c1c;
-      padding: 12px 15px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      font-size: 13px;
-      line-height: 1.5;
-      display: none;
-    }
-    table.match-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    table.match-table th, table.match-table td {
-      border: 1px solid #cbd5e1;
-      padding: 8px 10px;
-      text-align: left;
-    }
-    table.match-table th {
-      background: #f1f5f9;
-    }
+    .btn-reload { width: auto; padding: 5px 12px; background: #475569; font-size: 12px; margin-left: 10px; }
+    #map { height: 500px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 20px; }
+    .status-bar { background: #e0f2fe; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; font-weight: bold; color: #0369a1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .error-box { background: #fee2e2; color: #b91c1c; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; line-height: 1.5; display: none; }
+    table.match-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table.match-table th, table.match-table td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+    table.match-table th { background: #f1f5f9; }
   </style>
+  <script>
+    window.onerror = function(msg, url, line) {
+      var box = document.getElementById('error-box');
+      if (box) {
+        box.style.display = 'block';
+        box.innerHTML += '<div>⚠️ エラー(' + line + '行目): ' + msg + '</div>';
+      }
+      var st = document.getElementById('sys-status');
+      if (st) st.textContent = 'エラー検出';
+    };
+  </script>
 </head>
 <body>
 
@@ -122,7 +43,6 @@
   <div id="error-box" class="error-box"></div>
 
   <div class="panel-grid">
-    <!-- 1. 自局の運用場所登録 -->
     <div class="card">
       <h3>① 自局の運用場所を登録（事前登録）</h3>
       <div class="form-group">
@@ -140,7 +60,6 @@
       <button type="button" id="btn-reg" class="btn btn-station" onclick="handleReg()">自局の運用場所を登録・更新</button>
     </div>
 
-    <!-- 2. 交信相手の報告 -->
     <div class="card">
       <h3>② 交信相手の入力（相互一致でライン描画）</h3>
       <div class="form-group">
@@ -158,11 +77,11 @@
     </div>
   </div>
 
-  <div class="status-bar" id="status-bar">
+  <div class="status-bar">
     <div>
       システム状態: <span id="sys-status">起動中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
     </div>
-    <button type="button" id="btn-refresh" class="btn btn-reload" onclick="loadAllData()">最新データに更新</button>
+    <button type="button" class="btn btn-reload" onclick="loadAllData()">最新データに更新</button>
   </div>
 
   <div id="map"></div>
@@ -183,99 +102,81 @@
   </table>
 </div>
 
-<!-- ========================================================= -->
-<!-- ★FirebaseのURL設定（` ` の中身だけを書き換えてください）     -->
-<!-- ========================================================= -->
 <script>
-  const DATABASE_URL = `https://communication-map-b30e3-default-rtdb.firebaseio.com`;
-</script>
-<!-- ========================================================= -->
+  var DATABASE_URL = "https://communication-map-b30e3-default-rtdb.firebaseio.com";
+  var map = null;
+  var layerGroup = null;
 
-<script>
+  function initApp() {
+    document.getElementById('sys-status').textContent = 'プログラム認識OK・地図起動中...';
+
+    if (typeof L !== 'undefined') {
+      map = L.map('map').setView([36.2048, 138.2529], 6);
+      L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
+        attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+      }).addTo(map);
+      layerGroup = L.layerGroup().addTo(map);
+    } else {
+      showError('leaflet.js が正しく読み込めていません。leaflet.js の中身がHTMLページになっていないか確認してください。');
+    }
+
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('log-time').value = now.toISOString().slice(0, 16);
+
+    var savedCall = localStorage.getItem('my_qso_callsign');
+    if (savedCall) {
+      document.getElementById('reg-call').value = savedCall;
+    }
+
+    loadAllData();
+    setInterval(loadAllData, 10000);
+  }
+
   function showError(msg) {
-    const box = document.getElementById('error-box');
+    var box = document.getElementById('error-box');
     box.style.display = 'block';
     box.innerHTML = '<b>⚠️ お知らせ:</b><br>' + msg;
-    document.getElementById('sys-status').textContent = '設定・通信エラー';
-  }
-
-  // URLの改行・空白・末尾スラッシュを自動除去
-  const cleanDbUrl = DATABASE_URL.replace(/\s+/g, '').replace(/\/$/, '');
-
-  // 地図初期化
-  let map = null;
-  let layerGroup = null;
-  if (typeof L !== 'undefined') {
-    map = L.map('map').setView([36.2048, 138.2529], 6);
-    L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
-      attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
-    }).addTo(map);
-    layerGroup = L.layerGroup().addTo(map);
-  } else {
-    showError('leaflet.js が見つかりません。index.html と同じ場所にアップロードされているか確認してください。');
-  }
-
-  // 初期値セット
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('log-time').value = now.toISOString().slice(0, 16);
-
-  const savedCall = localStorage.getItem('my_qso_callsign');
-  if (savedCall) {
-    document.getElementById('reg-call').value = savedCall;
+    document.getElementById('sys-status').textContent = '通信エラー';
   }
 
   function encodeCall(call) {
     return call.trim().toUpperCase().replace(/\//g, '_');
   }
 
-  // データ取得・描画関数
-  async function loadAllData() {
-    if (cleanDbUrl.includes('★ここに') || !cleanDbUrl.startsWith('https://')) {
-      showError('コード内の <b>DATABASE_URL</b> に、Firebaseの「https://〇〇.firebaseio.com」または「https://〇〇.firebasedatabase.app」のURLを貼り付けてください。');
-      return;
-    }
-
-    try {
-      const [stRes, logRes] = await Promise.all([
-        fetch(cleanDbUrl + '/stations.json'),
-        fetch(cleanDbUrl + '/qso_logs.json')
-      ]);
-
-      if (!stRes.ok || !logRes.ok) {
-        throw new Error('アクセス拒否（ステータス: ' + stRes.status + '）。Firebaseの「Realtime Database > ルール」で .read と .write が true になっているか確認してください。');
+  function loadAllData() {
+    Promise.all([
+      fetch(DATABASE_URL + '/stations.json'),
+      fetch(DATABASE_URL + '/qso_logs.json')
+    ]).then(function(responses) {
+      if (!responses.ok || !responses.ok) {
+        throw new Error('アクセス拒否（ステータス: ' + responses.status + '）。Firebaseの「Realtime Database > ルール」で .read と .write が true になっているか確認してください。');
       }
-
-      const stationsData = (await stRes.json()) || {};
-      const logsData = (await logRes.json()) || {};
-
+      return Promise.all([responses.json(), responses.json()]);
+    }).then(function(data) {
+      var stationsData = data || {};
+      var logsData = data || {};
       document.getElementById('sys-status').textContent = 'オンライン接続完了';
       document.getElementById('error-box').style.display = 'none';
       renderAll(stationsData, logsData);
-    } catch (err) {
+    }).catch(function(err) {
       showError('データベース通信エラー: ' + err.message);
-    }
+    });
   }
 
-  // ① 自局登録ボタン
-  async function handleReg() {
-    if (cleanDbUrl.includes('★ここに') || !cleanDbUrl.startsWith('https://')) {
-      alert('DATABASE_URL が設定されていません。画面上部の赤い案内をご確認ください。');
-      return;
-    }
-
-    const rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
-    const place = document.getElementById('reg-place').value.trim();
-    const coordStr = document.getElementById('reg-coord').value.trim();
+  function handleReg() {
+    var rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
+    var place = document.getElementById('reg-place').value.trim();
+    var coordStr = document.getElementById('reg-coord').value.trim();
 
     if (!rawCall || !place || !coordStr) {
       alert('コールサイン、運用場所、座標をすべて入力してください。');
       return;
     }
 
-    const parts = coordStr.split(',');
-    const lat = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
-    const lon = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
+    var parts = coordStr.split(',');
+    var lat = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
+    var lon = parts.length >= 1 ? parseFloat(parts.shift().trim()) : NaN;
 
     if (isNaN(lat) || isNaN(lon)) {
       alert('座標は「35.3606, 138.7274」のように半角数字とカンマで入力してください。');
@@ -284,38 +185,29 @@
 
     localStorage.setItem('my_qso_callsign', rawCall);
 
-    try {
-      const res = await fetch(cleanDbUrl + '/stations/' + encodeCall(rawCall) + '.json', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callsign: rawCall,
-          place: place,
-          lat: lat,
-          lon: lon,
-          updatedAt: Date.now()
-        })
-      });
-
+    fetch(DATABASE_URL + '/stations/' + encodeCall(rawCall) + '.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        callsign: rawCall,
+        place: place,
+        lat: lat,
+        lon: lon,
+        updatedAt: Date.now()
+      })
+    }).then(function(res) {
       if (!res.ok) throw new Error('書き込み拒否（Firebaseのルール設定を確認してください）');
-
       alert(rawCall + ' の運用場所（' + place + '）を登録しました！');
       loadAllData();
-    } catch (e) {
+    }).catch(function(e) {
       showError('登録エラー: ' + e.message);
-    }
+    });
   }
 
-  // ② 交信報告ボタン
-  async function handleQso() {
-    if (cleanDbUrl.includes('★ここに') || !cleanDbUrl.startsWith('https://')) {
-      alert('DATABASE_URL が設定されていません。');
-      return;
-    }
-
-    const myCall = document.getElementById('reg-call').value.trim().toUpperCase();
-    const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
-    const timeVal = document.getElementById('log-time').value;
+  function handleQso() {
+    var myCall = document.getElementById('reg-call').value.trim().toUpperCase();
+    var targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
+    var timeVal = document.getElementById('log-time').value;
 
     if (!myCall) {
       alert('先に左側の「① 自局コールサイン」を入力してください。');
@@ -332,15 +224,43 @@
 
     localStorage.setItem('my_qso_callsign', myCall);
 
-    try {
-      const res = await fetch(cleanDbUrl + '/qso_logs.json', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: myCall,
-          to: targetCall,
-          time: timeVal.replace('T', ' '),
-          createdAt: Date.now()
-        })
-      });
+    fetch(DATABASE_URL + '/qso_logs.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: myCall,
+        to: targetCall,
+        time: timeVal.replace('T', ' '),
+        createdAt: Date.now()
+      })
+    }).then(function(res) {
+      if (!res.ok) throw new Error('送信拒否（Firebaseのルール設定を確認してください）');
+      document.getElementById('log-target-call').value = '';
+      alert(myCall + ' → ' + targetCall + ' の交信を送信しました。');
+      loadAllData();
+    }).catch(function(e) {
+      showError('送信エラー: ' + e.message);
+    });
+  }
+
+  function calcDistance(lat1, lon1, lat2, lon2) {
+    var R = 6371;
+    var toRad = function(deg) { return deg * Math.PI / 180; };
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+  }
+
+  function renderAll(stationsData, logsData) {
+    if (!layerGroup) return;
+    layerGroup.clearLayers();
+    var stationMap = {};
+    Object.values(stationsData).forEach(function(st) {
+      if (!st || !st.callsign) return;
+      stationMap[st.callsign] = st;
+      L.marker([st.lat, st.lon])
+        .bindPopup('<b>' + st.callsign + '</b><br>運用地: ' + st.place)
+        .addTo(layerGroup);
+    });
 
