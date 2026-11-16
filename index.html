@@ -66,7 +66,9 @@
 </table>
 
 <script>
-var DB_URL = "https://firebaseio.com";
+// ★ここにApps Scriptで発行されたウェブアプリのURLを貼り付けてください
+var GAS_URL = `https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec`;
+
 var map = null;
 var layerGroup = null;
 
@@ -92,32 +94,30 @@ function init() {
   setInterval(loadAllData, 10000);
 }
 
+function getCleanUrl() {
+  return GAS_URL.replace(/\s+/g, "");
+}
+
 function loadAllData() {
-  var stData = {};
-  fetch(DB_URL + "/stations.json")
-    .then(function(r) {
-      if (!r.ok) throw new Error("読込拒否(" + r.status + ") Firebaseのルールを確認してください");
-      return r.json();
-    })
-    .then(function(d) {
-      stData = d || {};
-      return fetch(DB_URL + "/qso_logs.json");
-    })
-    .then(function(r) {
-      if (!r.ok) throw new Error("読込拒否(" + r.status + ")");
-      return r.json();
-    })
-    .then(function(lgData) {
+  var url = getCleanUrl();
+  if (url.indexOf("https://google.com") !== 0) {
+    showErr("GAS_URL にウェブアプリのURL（https://google.com/.../exec）を貼り付けてください。");
+    return;
+  }
+  fetch(url + "?action=read")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       document.getElementById("sys-status").textContent = "接続完了";
       document.getElementById("err-box").style.display = "none";
-      render(stData, lgData || {});
+      render(data.stations || [], data.logs || []);
     })
     .catch(function(e) {
-      showErr(e.message);
+      showErr("通信エラー: " + e.message + "（デプロイ時のアクセス権限が「全員」になっているか確認してください）");
     });
 }
 
 function handleReg() {
+  var url = getCleanUrl();
   var call = document.getElementById("reg-call").value.trim().toUpperCase();
   var place = document.getElementById("reg-place").value.trim();
   var coord = document.getElementById("reg-coord").value.trim();
@@ -133,23 +133,26 @@ function handleReg() {
     return;
   }
   localStorage.setItem("my_call", call);
-  var key = call.replace(/\//g, "_");
-  fetch(DB_URL + "/stations/" + key + ".json", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ callsign: call, place: place, lat: lat, lon: lon })
-  })
-  .then(function(r) {
-    if (!r.ok) throw new Error("書込拒否(" + r.status + ") Firebaseのルールを確認してください");
-    alert(call + " を登録しました！");
-    loadAllData();
-  })
-  .catch(function(e) {
-    showErr(e.message);
-  });
+  document.getElementById("sys-status").textContent = "登録中...";
+
+  var query = "?action=reg&call=" + encodeURIComponent(call) +
+              "&place=" + encodeURIComponent(place) +
+              "&lat=" + encodeURIComponent(lat) +
+              "&lon=" + encodeURIComponent(lon);
+
+  fetch(url + query)
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      alert(call + " を登録しました！");
+      loadAllData();
+    })
+    .catch(function(e) {
+      showErr("登録エラー: " + e.message);
+    });
 }
 
 function handleQso() {
+  var url = getCleanUrl();
   var myCall = document.getElementById("reg-call").value.trim().toUpperCase();
   var tgCall = document.getElementById("log-target").value.trim().toUpperCase();
   var tm = document.getElementById("log-time").value;
@@ -166,20 +169,22 @@ function handleQso() {
     return;
   }
   localStorage.setItem("my_call", myCall);
-  fetch(DB_URL + "/qso_logs.json", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ from: myCall, to: tgCall, time: tm.replace("T", " ") })
-  })
-  .then(function(r) {
-    if (!r.ok) throw new Error("送信拒否(" + r.status + ") Firebaseのルールを確認してください");
-    document.getElementById("log-target").value = "";
-    alert(myCall + " → " + tgCall + " を送信しました！");
-    loadAllData();
-  })
-  .catch(function(e) {
-    showErr(e.message);
-  });
+  document.getElementById("sys-status").textContent = "送信中...";
+
+  var query = "?action=qso&from=" + encodeURIComponent(myCall) +
+              "&to=" + encodeURIComponent(tgCall) +
+              "&time=" + encodeURIComponent(tm.replace("T", " "));
+
+  fetch(url + query)
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      document.getElementById("log-target").value = "";
+      alert(myCall + " → " + tgCall + " を送信しました！");
+      loadAllData();
+    })
+    .catch(function(e) {
+      showErr("送信エラー: " + e.message);
+    });
 }
 
 function calcDist(lat1, lon1, lat2, lon2) {
@@ -191,22 +196,21 @@ function calcDist(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
 }
 
-function render(stationsData, logsData) {
+function render(stationsList, logsList) {
   if (!layerGroup) return;
   layerGroup.clearLayers();
   var stMap = {};
-  Object.values(stationsData).forEach(function(st) {
+  stationsList.forEach(function(st) {
     if (!st || !st.callsign) return;
     stMap[st.callsign] = st;
     L.marker([st.lat, st.lon]).bindPopup(st.callsign + " (" + st.place + ")").addTo(layerGroup);
   });
   document.getElementById("st-cnt").textContent = Object.keys(stMap).length;
 
-  var logs = Object.values(logsData);
   var pairs = new Map();
-  logs.forEach(function(a) {
+  logsList.forEach(function(a) {
     if (!a) return;
-    var b = logs.find(function(x) { return x && x.from === a.to && x.to === a.from; });
+    var b = logsList.find(function(x) { return x && x.from === a.to && x.to === a.from; });
     if (b) {
       var k = [a.from, a.to].sort().join("__");
       if (!pairs.has(k)) pairs.set(k, { a: a, b: b });
