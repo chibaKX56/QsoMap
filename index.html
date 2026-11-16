@@ -80,13 +80,14 @@ function showErr(msg) {
 function init() {
   if (typeof L !== "undefined") {
     map = L.map("map").setView([36.2048, 138.2529], 6);
-    L.tileLayer("https://gsi.go.jp{z}/{x}/{y}.png", {
-      attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+    // 世界標準のOpenStreetMapタイルを使用
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
     layerGroup = L.layerGroup().addTo(map);
     setTimeout(function() { map.invalidateSize(); }, 300);
   } else {
-    showErr("leaflet.js が読み込めませんでした。GitHubに leaflet.js が正しくアップロードされているか確認してください。");
+    showErr("leaflet.js が読み込めませんでした。");
   }
   var now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -207,7 +208,19 @@ function render(stationsList, logsList) {
   stationsList.forEach(function(st) {
     if (!st || !st.callsign) return;
     stMap[st.callsign] = st;
-    L.marker([st.lat, st.lon]).bindPopup(st.callsign + " (" + st.place + ")").addTo(layerGroup);
+
+    // 画像ファイル不要の丸型マーカー（サークルマーカー）で確実に表示
+    L.circleMarker([st.lat, st.lon], {
+      radius: 8,
+      fillColor: "#0284c7",
+      color: "#ffffff",
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.9
+    })
+    .bindPopup("<b>" + st.callsign + "</b><br>運用地: " + st.place)
+    .bindTooltip(st.callsign, { permanent: false, direction: "top" })
+    .addTo(layerGroup);
   });
   document.getElementById("st-cnt").textContent = Object.keys(stMap).length;
 
@@ -248,7 +261,3 @@ function render(stationsList, logsList) {
   }
 }
 
-window.addEventListener("load", init);
-</script>
-</body>
-</html>
