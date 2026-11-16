@@ -68,7 +68,7 @@
 </table>
 
 <script>
-var GAS_URL = "https://google.com";
+var GAS_URL = "https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec";
 var map = null;
 var layerGroup = null;
 
@@ -84,8 +84,6 @@ function init() {
     map = L.map("map").setView([36.2048, 138.2529], 6);
     L.tileLayer("https://gsi.go.jp{z}/{x}/{y}.png").addTo(map);
     layerGroup = L.layerGroup().addTo(map);
-  } else {
-    showErr("地図ライブラリ(Leaflet)の読み込みに失敗しました。");
   }
   var now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -96,21 +94,40 @@ function init() {
   setInterval(loadAllData, 10000);
 }
 
+// JSONP通信関数（ブラウザ制限を完全回避）
+function callGasJsonp(params, onSuccess) {
+  var cbName = "gasCb_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+  var script = document.createElement("script");
+  var timer = setTimeout(function() {
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    showErr("応答タイムアウト: Apps Scriptのデプロイ設定で「アクセスできるユーザー」が「全員」になっているか確認してください。");
+  }, 15000);
+
+  window[cbName] = function(data) {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    onSuccess(data);
+  };
+
+  script.onerror = function() {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    showErr("スクリプト読込エラー: URLが正しいか、Apps Scriptが「全員」公開で新バージョンデプロイされているか確認してください。");
+  };
+
+  script.src = GAS_URL + "?" + params + "&callback=" + cbName;
+  document.body.appendChild(script);
+}
+
 function loadAllData() {
-  fetch(GAS_URL + "?action=read", { redirect: "follow" })
-    .then(function(r) {
-      if (!r.ok) throw new Error("HTTPエラー: " + r.status);
-      return r.text();
-    })
-    .then(function(txt) {
-      var data = JSON.parse(txt);
-      document.getElementById("sys-status").textContent = "接続完了";
-      document.getElementById("err-box").style.display = "none";
-      render(data.stations || [], data.logs || []);
-    })
-    .catch(function(e) {
-      showErr("通信・データ解析エラー: " + e.message + "<br>※Apps Scriptの「デプロイを管理＞新バージョンでデプロイ」を行ったか確認してください。");
-    });
+  callGasJsonp("action=read", function(data) {
+    document.getElementById("sys-status").textContent = "接続完了";
+    document.getElementById("err-box").style.display = "none";
+    render(data.stations || [], data.logs || []);
+  });
 }
 
 function handleReg() {
@@ -131,20 +148,15 @@ function handleReg() {
   localStorage.setItem("my_call", call);
   document.getElementById("sys-status").textContent = "登録中...";
 
-  var query = "?action=reg&call=" + encodeURIComponent(call) +
+  var query = "action=reg&call=" + encodeURIComponent(call) +
               "&place=" + encodeURIComponent(place) +
               "&lat=" + encodeURIComponent(lat) +
               "&lon=" + encodeURIComponent(lon);
 
-  fetch(GAS_URL + query, { redirect: "follow" })
-    .then(function(r) { return r.text(); })
-    .then(function() {
-      alert(call + " を登録しました！");
-      loadAllData();
-    })
-    .catch(function(e) {
-      showErr("登録エラー: " + e.message);
-    });
+  callGasJsonp(query, function() {
+    alert(call + " を登録しました！");
+    loadAllData();
+  });
 }
 
 function handleQso() {
@@ -166,20 +178,15 @@ function handleQso() {
   localStorage.setItem("my_call", myCall);
   document.getElementById("sys-status").textContent = "送信中...";
 
-  var query = "?action=qso&from=" + encodeURIComponent(myCall) +
+  var query = "action=qso&from=" + encodeURIComponent(myCall) +
               "&to=" + encodeURIComponent(tgCall) +
               "&time=" + encodeURIComponent(tm.replace("T", " "));
 
-  fetch(GAS_URL + query, { redirect: "follow" })
-    .then(function(r) { return r.text(); })
-    .then(function() {
-      document.getElementById("log-target").value = "";
-      alert(myCall + " → " + tgCall + " を送信しました！");
-      loadAllData();
-    })
-    .catch(function(e) {
-      showErr("送信エラー: " + e.message);
-    });
+  callGasJsonp(query, function() {
+    document.getElementById("log-target").value = "";
+    alert(myCall + " → " + tgCall + " を送信しました！");
+    loadAllData();
+  });
 }
 
 function calcDist(lat1, lon1, lat2, lon2) {
