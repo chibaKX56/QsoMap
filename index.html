@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リアルタイム無線交信（QSO）マッチングマップ</title>
+  <link rel="stylesheet" href="https://unpkg.com" />
+  <style>
+    .qso-app {
+      max-width: 960px;
+      margin: 0 auto;
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif;
+      color: #333;
+    }
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+    .card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .card h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      color: #0f172a;
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 6px;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #475569;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      border: 1px solid #94a3b8;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #fff;
+      cursor: pointer;
+    }
+    .btn-station { background: #0284c7; }
+    .btn-station:hover { background: #0369a1; }
+    .btn-qso { background: #16a34a; }
+    .btn-qso:hover { background: #15803d; }
+    #map {
+      height: 500px;
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid #94a3b8;
+      margin-bottom: 20px;
+    }
+    .status-bar {
+      background: #e0f2fe;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #0369a1;
+    }
+    table.match-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    table.match-table th, table.match-table td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    table.match-table th {
+      background: #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+
+<div class="qso-app">
+  <div class="panel-grid">
+    <!-- 1. 自局の運用場所登録 -->
+    <div class="card">
+      <h3>① 自局の運用場所を登録（事前登録）</h3>
+      <div class="form-group">
+        <label>自局コールサイン *</label>
+        <input type="text" id="reg-call" placeholder="例: JQ1XYZ/1">
+      </div>
+      <div class="form-group">
+        <label>運用場所名 *</label>
+        <input type="text" id="reg-place" placeholder="例: 富士山山頂">
+      </div>
+      <div class="form-group">
+        <label>運用場所の座標 (緯度, 経度) *</label>
+        <input type="text" id="reg-coord" placeholder="例: 35.3606, 138.7274">
+      </div>
+      <button type="button" class="btn btn-station" onclick="registerStation()">自局の運用場所を登録・更新</button>
+    </div>
+
+    <!-- 2. 交信相手の報告 -->
+    <div class="card">
+      <h3>② 交信相手の入力（相互一致でライン描画）</h3>
+      <div class="form-group">
+        <label>自局コールサイン *</label>
+        <input type="text" id="log-my-call" placeholder="例: JQ1XYZ/1">
+      </div>
+      <div class="form-group">
+        <label>相手局コールサイン *</label>
+        <input type="text" id="log-target-call" placeholder="例: JJ1AAA/1">
+      </div>
+      <div class="form-group">
+        <label>交信時間 *</label>
+        <input type="datetime-local" id="log-time">
+      </div>
+      <button type="button" class="btn btn-qso" onclick="submitQSO()">交信ログを送信する</button>
+    </div>
+  </div>
+
+  <!-- ステータス表示 -->
+  <div class="status-bar" id="status-bar">
+    登録局数: <span id="stat-stations">0</span>局 ｜ 成立（相互一致）ライン数: <span id="stat-matches">0</span>本
+  </div>
+
+  <!-- 地図エリア -->
+  <div id="map"></div>
+
+  <!-- 成立した交信一覧 -->
+  <h3>成立した交信一覧（双方入力済み）</h3>
+  <table class="match-table">
+    <thead>
+      <tr>
+        <th>局A（コール / 運用地）</th>
+        <th>局B（コール / 運用地）</th>
+        <th>交信距離</th>
+        <th>交信時間（A報告 / B報告）</th>
+      </tr>
+    </thead>
+    <tbody id="match-tbody">
+      <tr><td colspan="4" style="text-align:center; color:#64748b;">双方の入力が一致するとここに表示されます</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com"></script>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://gstatic.com";
+  import { getDatabase, ref, set, push, onValue } from "https://gstatic.com";
+
+  // =========================================================
+  // ★ここにFirebaseコンソールで取得した設定を貼り付けてください
+  // =========================================================
+  const firebaseConfig = {
+  apiKey: "AIzaSyCNfdXz9KhPsFDVMwsfyk-3JtDQjUo-cRs",
+  authDomain: "communication-map-b30e3.firebaseapp.com",
+  databaseURL: "https://communication-map-b30e3-default-rtdb.firebaseio.com",
+  projectId: "communication-map-b30e3",
+  storageBucket: "communication-map-b30e3.firebasestorage.app",
+  messagingSenderId: "942567738907",
+  appId: "1:942567738907:web:702678d0071795878132be",
+  measurementId: "G-7C3JNN1FYN"
+};
+  // =========================================================
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // 地図初期化
+  const map = L.map('map').setView([36.2048, 138.2529], 6);
+  L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
+    attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+  }).addTo(map);
+  const layerGroup = L.layerGroup().addTo(map);
+
+  // 現在時刻を初期セット
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('log-time').value = now.toISOString().slice(0, 16);
+
+  // ブラウザに自局コールサインを記憶させて入力の手間を省く
+  const savedCall = localStorage.getItem('my_qso_callsign');
+  if (savedCall) {
+    document.getElementById('reg-call').value = savedCall;
+    document.getElementById('log-my-call').value = savedCall;
+  }
+
+  // Firebaseキー用にコールサインの「/」を「_」に変換
+  const encodeCall = (call) => call.trim().toUpperCase().replace(/\//g, '_');
+
+  // ① 自局の運用場所登録処理
+  window.registerStation = async function() {
+    const rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
+    const place = document.getElementById('reg-place').value.trim();
+    const coordStr = document.getElementById('reg-coord').value.trim();
+
+    if (!rawCall || !place || !coordStr) {
+      alert('コールサイン、運用場所、座標をすべて入力してください。');
+      return;
+    }
+    const parts = coordStr.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length !== 2 || isNaN(parts) || isNaN(parts)) {
+      alert('座標は「35.3606, 138.7274」の形式で入力してください。');
+      return;
+    }
+
+    localStorage.setItem('my_qso_callsign', rawCall);
+    document.getElementById('log-my-call').value = rawCall;
+
+    await set(ref(db, 'stations/' + encodeCall(rawCall)), {
+      callsign: rawCall,
+      place: place,
+      lat: parts,
+      lon: parts,
+      updatedAt: Date.now()
+    });
+
+    alert(`${rawCall} の運用場所（${place}）を登録しました。`);
+  };
+
+  // ② 交信相手の報告処理
+  window.submitQSO = async function() {
+    const myCall = document.getElementById('log-my-call').value.trim().toUpperCase();
+    const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
+    const timeVal = document.getElementById('log-time').value;
+
+    if (!myCall || !targetCall || !timeVal) {
+      alert('自局コールサイン、相手局コールサイン、交信時間を入力してください。');
+      return;
+    }
+    if (myCall === targetCall) {
+      alert('自局と相手局に同じコールサインは指定できません。');
+      return;
+    }
+
+    localStorage.setItem('my_qso_callsign', myCall);
+
+    await push(ref(db, 'qso_logs'), {
+      from: myCall,
+      to: targetCall,
+      time: timeVal.replace('T', ' '),
+      createdAt: Date.now()
+    });
+
+    document.getElementById('log-target-call').value = '';
+    alert(`${targetCall} との交信を送信しました。相手局の入力と一致するとラインが引かれます。`);
+  };
+
+  // 2点間の距離計算 (km)
+  function calcDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = deg => deg * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+  }
+
+  // リアルタイムデータ監視＆マッチング描画
+  let stationsData = {};
+  let logsData = {};
+
+  onValue(ref(db, 'stations'), (snapshot) => {
+    stationsData = snapshot.val() || {};
+    renderAll();
+  });
+
+  onValue(ref(db, 'qso_logs'), (snapshot) => {
+    logsData = snapshot.val() || {};
+    renderAll();
+  });
+
+  function renderAll() {
+    layerGroup.clearLayers();
+    const stationMap = {};
+    Object.values(stationsData).forEach(st => {
+      stationMap[st.callsign] = st;
+      // 登録局のピンを地図に表示
+      L.marker([st.lat, st.lon])
+        .bindPopup(`<b>${st.callsign}</b><br>運用地: ${st.place}`)
+        .addTo(layerGroup);
+    });
+
+    document.getElementById('stat-stations').textContent = Object.keys(stationMap).length;
+
+    const logs = Object.values(logsData);
+    const matchedPairs = new Map();
+
+    // 相互一致（A→B と B→A の両方が存在するか）をチェック
+    logs.forEach(logA => {
+      const logB = logs.find(item => item.from === logA.to && item.to === logA.from);
+      if (logB) {
+        const pairKey = [logA.from, logA.to].sort().join('__');
+        if (!matchedPairs.has(pairKey)) {
+          matchedPairs.set(pairKey, { logA, logB });
+        }
+      }
+    });
+
+    const tbody = document.getElementById('match-tbody');
+    tbody.innerHTML = '';
+    let lineCount = 0;
+
+    matchedPairs.forEach(({ logA, logB }) => {
+      const stA = stationMap[logA.from];
+      const stB = stationMap[logB.from];
+
+      // 双方の運用場所が登録済みの場合にラインを描画
+      if (stA && stB) {
+        lineCount++;
+        const dist = calcDistance(stA.lat, stA.lon, stB.lat, stB.lon);
+
+        const polyline = L.polyline([[stA.lat, stA.lon], [stB.lat, stB.lon]], {
+          color: '#e11d48',
+          weight: 4,
+          opacity: 0.85
