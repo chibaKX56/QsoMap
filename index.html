@@ -4,8 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>リアルタイム無線交信（QSO）マッチングマップ</title>
-  <link rel="stylesheet" href="https://jsdelivr.net" />
-  <script src="https://jsdelivr.net"></script>
+  <!-- Cloudflare CDN + ローカルフォールバック -->
+  <link rel="stylesheet" href="https://cloudflare.com" onerror="this.href='leaflet.css'" />
+  <script src="https://cloudflare.com"></script>
+  <script>
+    if (typeof L === 'undefined') {
+      document.write('<script src="leaflet.js"><\/script>');
+    }
+  </script>
   <style>
     .qso-app {
       max-width: 960px;
@@ -185,7 +191,6 @@
 </script>
 <!-- ========================================================= -->
 
-<!-- 1. 地図を即座に起動する通常スクリプト -->
 <script>
   window.showError = function(msg) {
     const box = document.getElementById('error-box');
@@ -206,7 +211,7 @@
     window.layerGroup = L.layerGroup().addTo(window.map);
     document.getElementById('sys-status').textContent = '地図表示完了・データベース接続中...';
   } else {
-    window.showError('地図プログラムの読み込みに失敗しました。');
+    window.showError('地図プログラム（leaflet.js）の読み込みがブロックされています。GitHubに leaflet.js と leaflet.css を直接アップロードしてください。');
   }
 
   const now = new Date();
@@ -219,7 +224,6 @@
   }
 </script>
 
-<!-- 2. Firebase通信モジュール -->
 <script type="module">
   import { initializeApp } from "https://gstatic.com";
   import { getDatabase, ref, set, push, onValue } from "https://gstatic.com";
@@ -322,7 +326,3 @@
 
   function calcDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
-    const toRad = deg => deg * Math.PI / 180;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
