@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>リアルタイム無線交信（QSO）マッチングマップ</title>
-<link rel="stylesheet" href="leaflet.css" />
-<script src="leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com" />
+<script src="https://unpkg.com"></script>
 <style>
   body { font-family: sans-serif; color: #333; max-width: 960px; margin: 0 auto; padding: 10px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 15px; }
@@ -18,7 +18,7 @@
   .btn-blue { background: #0284c7; }
   .btn-green { background: #16a34a; }
   .btn-gray { width: auto; padding: 5px 10px; background: #475569; font-size: 12px; }
-  #map { height: 480px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; background: #e2e8f0; }
+  #map { height: 480px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; background: #e2e8f0; position: relative; overflow: hidden; }
   .bar { background: #e0f2fe; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #0369a1; display: flex; justify-content: space-between; align-items: center; }
   .err { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-size: 13px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -33,15 +33,15 @@
 <div class="grid">
   <div class="card">
     <h3>① 自局の運用場所を登録（事前登録）</h3>
-    <div class="fg"><label>自局コールサイン *</label><input type="text" id="reg-call" placeholder="例: JQ1XYZ/1"></div>
-    <div class="fg"><label>運用場所名 *</label><input type="text" id="reg-place" placeholder="例: 富士山山頂"></div>
-    <div class="fg"><label>運用場所の座標 (緯度, 経度) *</label><input type="text" id="reg-coord" placeholder="例: 35.3606, 138.7274"></div>
+    <div class="fg"><label>自局コールサイン *</label><input type="text" id="reg-call" placeholder="例: チバKX56"></div>
+    <div class="fg"><label>運用場所名 *</label><input type="text" id="reg-place" placeholder="例: 月山山頂"></div>
+    <div class="fg"><label>運用場所の座標 (緯度, 経度) *</label><input type="text" id="reg-coord" placeholder="例: 38.5497, 140.0269"></div>
     <button type="button" class="btn btn-blue" onclick="handleReg()">自局の運用場所を登録・更新</button>
   </div>
 
   <div class="card">
     <h3>② 交信相手の入力（相互一致でライン描画）</h3>
-    <div class="fg"><label>相手局コールサイン *</label><input type="text" id="log-target" placeholder="例: JJ1AAA/1"></div>
+    <div class="fg"><label>相手局コールサイン *</label><input type="text" id="log-target" placeholder="例: サイタマKM117"></div>
     <div class="fg"><label>交信時間 *</label><input type="datetime-local" id="log-time"></div>
     <p style="font-size: 12px; color: #64748b; margin: 0 0 10px 0;">※①の自局コールサインとして送信されます。</p>
     <button type="button" class="btn btn-green" onclick="handleQso()">交信ログを送信する</button>
@@ -61,7 +61,7 @@
     <tr><th>局A</th><th>局B</th><th>交信距離</th><th>交信時間</th></tr>
   </thead>
   <tbody id="tbody">
-    <tr><td colspan="4" style="text-align:center;">双方の入力と運用場所登録が揃うとここに表示されます</td></tr>
+    <tr><td colspan="4" style="text-align:center;">読み込み中...</td></tr>
   </tbody>
 </table>
 
@@ -78,22 +78,23 @@ function showErr(msg) {
 }
 
 function init() {
-  if (typeof L !== "undefined") {
-    map = L.map("map").setView([36.2048, 138.2529], 6);
-    // 世界標準のOpenStreetMapタイルを使用
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-    layerGroup = L.layerGroup().addTo(map);
-    setTimeout(function() { map.invalidateSize(); }, 300);
-  } else {
-    showErr("leaflet.js が読み込めませんでした。");
-  }
   var now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   document.getElementById("log-time").value = now.toISOString().slice(0, 16);
   var saved = localStorage.getItem("my_call");
   if (saved) document.getElementById("reg-call").value = saved;
+
+  if (typeof L !== "undefined") {
+    map = L.map("map").setView([36.8, 139.5], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    layerGroup = L.layerGroup().addTo(map);
+  } else {
+    showErr("地図プログラム(Leaflet)がブロックされています。ブラウザの広告ブロッカーやセキュリティ設定を確認してください。");
+  }
+
+  // 地図の成否に関わらず必ずデータを読み込む
   loadAllData();
   setInterval(loadAllData, 10000);
 }
@@ -104,7 +105,7 @@ function callGasJsonp(params, onSuccess) {
   var timer = setTimeout(function() {
     delete window[cbName];
     if (script.parentNode) script.parentNode.removeChild(script);
-    showErr("応答タイムアウト: Apps Scriptのデプロイ設定を確認してください。");
+    showErr("通信タイムアウト: Apps Scriptの応答がありません。");
   }, 15000);
 
   window[cbName] = function(data) {
@@ -118,7 +119,7 @@ function callGasJsonp(params, onSuccess) {
     clearTimeout(timer);
     delete window[cbName];
     if (script.parentNode) script.parentNode.removeChild(script);
-    showErr("通信エラー: URLやデプロイ設定を確認してください。");
+    showErr("通信エラー: スクリプトURLへの接続に失敗しました。");
   };
 
   script.src = GAS_URL + "?" + params + "&callback=" + cbName;
@@ -128,7 +129,6 @@ function callGasJsonp(params, onSuccess) {
 function loadAllData() {
   callGasJsonp("action=read", function(data) {
     document.getElementById("sys-status").textContent = "接続完了";
-    document.getElementById("err-box").style.display = "none";
     render(data.stations || [], data.logs || []);
   });
 }
@@ -145,7 +145,7 @@ function handleReg() {
   var lat = parseFloat(p.shift());
   var lon = parseFloat(p.shift());
   if (isNaN(lat) || isNaN(lon)) {
-    alert("座標は「35.3606, 138.7274」の形式で入力してください。");
+    alert("座標は「38.5497, 140.0269」の形式で入力してください。");
     return;
   }
   localStorage.setItem("my_call", call);
@@ -202,25 +202,25 @@ function calcDist(lat1, lon1, lat2, lon2) {
 }
 
 function render(stationsList, logsList) {
-  if (!layerGroup) return;
-  layerGroup.clearLayers();
   var stMap = {};
+  if (layerGroup) layerGroup.clearLayers();
+
   stationsList.forEach(function(st) {
     if (!st || !st.callsign) return;
     stMap[st.callsign] = st;
-
-    // 画像ファイル不要の丸型マーカー（サークルマーカー）で確実に表示
-    L.circleMarker([st.lat, st.lon], {
-      radius: 8,
-      fillColor: "#0284c7",
-      color: "#ffffff",
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.9
-    })
-    .bindPopup("<b>" + st.callsign + "</b><br>運用地: " + st.place)
-    .bindTooltip(st.callsign, { permanent: false, direction: "top" })
-    .addTo(layerGroup);
+    if (layerGroup) {
+      L.circleMarker([st.lat, st.lon], {
+        radius: 8,
+        fillColor: "#0284c7",
+        color: "#ffffff",
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.9
+      })
+      .bindPopup("<b>" + st.callsign + "</b><br>運用地: " + st.place)
+      .bindTooltip(st.callsign, { permanent: true, direction: "top" })
+      .addTo(layerGroup);
+    }
   });
   document.getElementById("st-cnt").textContent = Object.keys(stMap).length;
 
@@ -244,20 +244,18 @@ function render(stationsList, logsList) {
     if (stA && stB) {
       cnt++;
       var dist = calcDist(stA.lat, stA.lon, stB.lat, stB.lon);
-      L.polyline([[stA.lat, stA.lon], [stB.lat, stB.lon]], { color: "#e11d48", weight: 4 }).addTo(layerGroup);
-      var mLat = (stA.lat + stB.lat) / 2;
-      var mLon = (stA.lon + stB.lon) / 2;
-      L.tooltip({ permanent: true, direction: "center" }).setLatLng([mLat, mLon]).setContent(dist + " km").addTo(layerGroup);
+      if (layerGroup) {
+        L.polyline([[stA.lat, stA.lon], [stB.lat, stB.lon]], { color: "#e11d48", weight: 4 }).addTo(layerGroup);
+        var mLat = (stA.lat + stB.lat) / 2;
+        var mLon = (stA.lon + stB.lon) / 2;
+        L.tooltip({ permanent: true, direction: "center" }).setLatLng([mLat, mLon]).setContent(dist + " km").addTo(layerGroup);
+      }
 
       var tr = document.createElement("tr");
-      tr.innerHTML = "<td>" + stA.callsign + " (" + stA.place + ")</td><td>" + stB.callsign + " (" + stB.place + ")</td><td><b>" + dist + " km</b></td><td>" + p.a.from + ": " + p.a.time + "<br>" + p.b.from + ": " + p.b.time + "</td>";
+      tr.innerHTML = "<td><b>" + stA.callsign + "</b> (" + stA.place + ")</td><td><b>" + stB.callsign + "</b> (" + stB.place + ")</td><td><b>" + dist + " km</b></td><td>" + p.a.from + ": " + p.a.time + "<br>" + p.b.from + ": " + p.b.time + "</td>";
       tbody.appendChild(tr);
     }
   });
 
   document.getElementById("mt-cnt").textContent = cnt;
   if (cnt === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">双方の入力と運用場所登録が揃うとここに表示されます</td></tr>';
-  }
-}
-
