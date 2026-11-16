@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>リアルタイム無線交信（QSO）マッチングマップ</title>
-<link rel="stylesheet" href="https://unpkg.com" />
-<script src="https://unpkg.com"></script>
 <style>
   body { font-family: sans-serif; color: #333; max-width: 960px; margin: 0 auto; padding: 10px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 15px; }
@@ -18,7 +16,7 @@
   .btn-blue { background: #0284c7; }
   .btn-green { background: #16a34a; }
   .btn-gray { width: auto; padding: 5px 10px; background: #475569; font-size: 12px; }
-  #map { height: 480px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; background: #e2e8f0; position: relative; overflow: hidden; }
+  #map-canvas { width: 100%; height: 480px; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; background: #dbeafe; display: block; }
   .bar { background: #e0f2fe; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #0369a1; display: flex; justify-content: space-between; align-items: center; }
   .err { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-size: 13px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -49,11 +47,11 @@
 </div>
 
 <div class="bar">
-  <div>状態: <span id="sys-status">起動中...</span> ｜ 登録: <span id="st-cnt">0</span>局 ｜ 成立: <span id="mt-cnt">0</span>本</div>
+  <div>状態: <span id="sys-status">データ取得中...</span> ｜ 登録: <span id="st-cnt">0</span>局 ｜ 成立: <span id="mt-cnt">0</span>本</div>
   <button type="button" class="btn btn-gray" onclick="loadAllData()">最新に更新</button>
 </div>
 
-<div id="map"></div>
+<canvas id="map-canvas" width="900" height="480"></canvas>
 
 <h3>成立した交信一覧（双方入力済み）</h3>
 <table>
@@ -67,36 +65,12 @@
 
 <script>
 var GAS_URL = "https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec";
-var map = null;
-var layerGroup = null;
 
 function showErr(msg) {
   var b = document.getElementById("err-box");
   b.style.display = "block";
   b.innerHTML = "⚠️ " + msg;
   document.getElementById("sys-status").textContent = "エラー";
-}
-
-function init() {
-  var now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById("log-time").value = now.toISOString().slice(0, 16);
-  var saved = localStorage.getItem("my_call");
-  if (saved) document.getElementById("reg-call").value = saved;
-
-  if (typeof L !== "undefined") {
-    map = L.map("map").setView([36.8, 139.5], 6);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-    layerGroup = L.layerGroup().addTo(map);
-  } else {
-    showErr("地図プログラム(Leaflet)がブロックされています。ブラウザの広告ブロッカーやセキュリティ設定を確認してください。");
-  }
-
-  // 地図の成否に関わらず必ずデータを読み込む
-  loadAllData();
-  setInterval(loadAllData, 10000);
 }
 
 function callGasJsonp(params, onSuccess) {
@@ -129,6 +103,7 @@ function callGasJsonp(params, onSuccess) {
 function loadAllData() {
   callGasJsonp("action=read", function(data) {
     document.getElementById("sys-status").textContent = "接続完了";
+    document.getElementById("err-box").style.display = "none";
     render(data.stations || [], data.logs || []);
   });
 }
@@ -201,61 +176,104 @@ function calcDist(lat1, lon1, lat2, lon2) {
   return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
 }
 
-function render(stationsList, logsList) {
-  var stMap = {};
-  if (layerGroup) layerGroup.clearLayers();
+function drawMapCanvas(stMap, matchedList) {
+  var canvas = document.getElementById("map-canvas");
+  var ctx = canvas.getContext("2d");
+  var W = canvas.width;
+  var H = canvas.height;
 
-  stationsList.forEach(function(st) {
-    if (!st || !st.callsign) return;
-    stMap[st.callsign] = st;
-    if (layerGroup) {
-      L.circleMarker([st.lat, st.lon], {
-        radius: 8,
-        fillColor: "#0284c7",
-        color: "#ffffff",
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.9
-      })
-      .bindPopup("<b>" + st.callsign + "</b><br>運用地: " + st.place)
-      .bindTooltip(st.callsign, { permanent: true, direction: "top" })
-      .addTo(layerGroup);
-    }
-  });
-  document.getElementById("st-cnt").textContent = Object.keys(stMap).length;
+  ctx.fillStyle = "#e0f2fe";
+  ctx.fillRect(0, 0, W, H);
 
-  var pairs = new Map();
-  logsList.forEach(function(a) {
-    if (!a) return;
-    var b = logsList.find(function(x) { return x && x.from === a.to && x.to === a.from; });
-    if (b) {
-      var k = [a.from, a.to].sort().join("__");
-      if (!pairs.has(k)) pairs.set(k, { a: a, b: b });
-    }
-  });
+  ctx.strokeStyle = "#bae6fd";
+  ctx.lineWidth = 1;
+  for (var gx = 0; gx <= W; gx += 90) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+  }
+  for (var gy = 0; gy <= H; gy += 80) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+  }
 
-  var tbody = document.getElementById("tbody");
-  tbody.innerHTML = "";
-  var cnt = 0;
+  var stations = Object.values(stMap);
+  if (stations.length === 0) {
+    ctx.fillStyle = "#64748b";
+    ctx.font = "16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("運用場所が登録されるとここにプロットされます", W / 2, H / 2);
+    return;
+  }
 
-  pairs.forEach(function(p) {
-    var stA = stMap[p.a.from];
-    var stB = stMap[p.b.from];
-    if (stA && stB) {
-      cnt++;
-      var dist = calcDist(stA.lat, stA.lon, stB.lat, stB.lon);
-      if (layerGroup) {
-        L.polyline([[stA.lat, stA.lon], [stB.lat, stB.lon]], { color: "#e11d48", weight: 4 }).addTo(layerGroup);
-        var mLat = (stA.lat + stB.lat) / 2;
-        var mLon = (stA.lon + stB.lon) / 2;
-        L.tooltip({ permanent: true, direction: "center" }).setLatLng([mLat, mLon]).setContent(dist + " km").addTo(layerGroup);
-      }
-
-      var tr = document.createElement("tr");
-      tr.innerHTML = "<td><b>" + stA.callsign + "</b> (" + stA.place + ")</td><td><b>" + stB.callsign + "</b> (" + stB.place + ")</td><td><b>" + dist + " km</b></td><td>" + p.a.from + ": " + p.a.time + "<br>" + p.b.from + ": " + p.b.time + "</td>";
-      tbody.appendChild(tr);
-    }
+  var minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+  stations.forEach(function(s) {
+    if (s.lat < minLat) minLat = s.lat;
+    if (s.lat > maxLat) maxLat = s.lat;
+    if (s.lon < minLon) minLon = s.lon;
+    if (s.lon > maxLon) maxLon = s.lon;
   });
 
-  document.getElementById("mt-cnt").textContent = cnt;
-  if (cnt === 0) {
+  var padLat = Math.max((maxLat - minLat) * 0.3, 0.5);
+  var padLon = Math.max((maxLon - minLon) * 0.3, 0.5);
+  minLat -= padLat; maxLat += padLat;
+  minLon -= padLon; maxLon += padLon;
+
+  var midLatRad = ((minLat + maxLat) / 2) * Math.PI / 180;
+  var lonScale = Math.cos(midLatRad);
+
+  var spanLon = (maxLon - minLon) * lonScale;
+  var spanLat = maxLat - minLat;
+  var scale = Math.min((W - 120) / spanLon, (H - 100) / spanLat);
+
+  var centerLon = (minLon + maxLon) / 2;
+  var centerLat = (minLat + maxLat) / 2;
+
+  function toXY(lat, lon) {
+    var x = W / 2 + (lon - centerLon) * lonScale * scale;
+    var y = H / 2 - (lat - centerLat) * scale;
+    return { x: x, y: y };
+  }
+
+  matchedList.forEach(function(item) {
+    var p1 = toXY(item.stA.lat, item.stA.lon);
+    var p2 = toXY(item.stB.lat, item.stB.lon);
+
+    ctx.strokeStyle = "#e11d48";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    var mx = (p1.x + p2.x) / 2;
+    var my = (p1.y + p2.y) / 2;
+    var label = item.dist + " km";
+    ctx.font = "bold 14px sans-serif";
+    var tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillRect(mx - tw / 2 - 6, my - 12, tw + 12, 24);
+    ctx.strokeStyle = "#e11d48";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(mx - tw / 2 - 6, my - 12, tw + 12, 24);
+
+    ctx.fillStyle = "#be123c";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, mx, my);
+  });
+
+  stations.forEach(function(st) {
+    var pt = toXY(st.lat, st.lon);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#0284c7";
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = "#0f172a";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
