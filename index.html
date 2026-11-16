@@ -137,7 +137,7 @@
         <label>運用場所の座標 (緯度, 経度) *</label>
         <input type="text" id="reg-coord" placeholder="例: 35.3606, 138.7274">
       </div>
-      <button type="button" id="btn-reg" class="btn btn-station">自局の運用場所を登録・更新</button>
+      <button type="button" id="btn-reg" class="btn btn-station" onclick="handleReg()">自局の運用場所を登録・更新</button>
     </div>
 
     <!-- 2. 交信相手の報告 -->
@@ -154,7 +154,7 @@
       <p style="font-size: 12px; color: #64748b; margin: 0 0 10px 0;">
         ※①で入力した自局コールサインとして送信されます。
       </p>
-      <button type="button" id="btn-qso" class="btn btn-qso">交信ログを送信する</button>
+      <button type="button" id="btn-qso" class="btn btn-qso" onclick="handleQso()">交信ログを送信する</button>
     </div>
   </div>
 
@@ -162,7 +162,7 @@
     <div>
       システム状態: <span id="sys-status">起動中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
     </div>
-    <button type="button" id="btn-refresh" class="btn btn-reload">最新データに更新</button>
+    <button type="button" id="btn-refresh" class="btn btn-reload" onclick="loadAllData()">最新データに更新</button>
   </div>
 
   <div id="map"></div>
@@ -184,10 +184,10 @@
 </div>
 
 <!-- ========================================================= -->
-<!-- ★FirebaseのURL設定（"" の中身だけを書き換えてください）      -->
+<!-- ★FirebaseのURL設定（` ` の中身だけを書き換えてください）     -->
 <!-- ========================================================= -->
 <script>
-  const DATABASE_URL = "https://communication-map-b30e3-default-rtdb.firebaseio.com";
+  const DATABASE_URL = `https://communication-map-b30e3-default-rtdb.firebaseio.com`;
 </script>
 <!-- ========================================================= -->
 
@@ -196,15 +196,24 @@
     const box = document.getElementById('error-box');
     box.style.display = 'block';
     box.innerHTML = '<b>⚠️ お知らせ:</b><br>' + msg;
-    document.getElementById('sys-status').textContent = 'エラー停止';
+    document.getElementById('sys-status').textContent = '設定・通信エラー';
   }
 
+  // URLの改行・空白・末尾スラッシュを自動除去
+  const cleanDbUrl = DATABASE_URL.replace(/\s+/g, '').replace(/\/$/, '');
+
   // 地図初期化
-  const map = L.map('map').setView([36.2048, 138.2529], 6);
-  L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
-    attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
-  }).addTo(map);
-  const layerGroup = L.layerGroup().addTo(map);
+  let map = null;
+  let layerGroup = null;
+  if (typeof L !== 'undefined') {
+    map = L.map('map').setView([36.2048, 138.2529], 6);
+    L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
+      attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+    }).addTo(map);
+    layerGroup = L.layerGroup().addTo(map);
+  } else {
+    showError('leaflet.js が見つかりません。index.html と同じ場所にアップロードされているか確認してください。');
+  }
 
   // 初期値セット
   const now = new Date();
@@ -216,17 +225,14 @@
     document.getElementById('reg-call').value = savedCall;
   }
 
-  // URL末尾のスラッシュを整理
-  const cleanDbUrl = DATABASE_URL.trim().replace(/\/$/, "");
-
   function encodeCall(call) {
     return call.trim().toUpperCase().replace(/\//g, '_');
   }
 
-  // データ取得・描画関数（REST API通信）
+  // データ取得・描画関数
   async function loadAllData() {
-    if (cleanDbUrl.includes("★ここに") || !cleanDbUrl.startsWith("https://")) {
-      showError("コード内の <b>DATABASE_URL</b> に、Firebaseの「https://〇〇.firebaseio.com」または「https://〇〇.firebasedatabase.app」のURLを貼り付けてください。");
+    if (cleanDbUrl.includes('★ここに') || !cleanDbUrl.startsWith('https://')) {
+      showError('コード内の <b>DATABASE_URL</b> に、Firebaseの「https://〇〇.firebaseio.com」または「https://〇〇.firebasedatabase.app」のURLを貼り付けてください。');
       return;
     }
 
@@ -237,7 +243,7 @@
       ]);
 
       if (!stRes.ok || !logRes.ok) {
-        throw new Error("アクセス拒否（ステータス: " + stRes.status + "）。Firebaseの「Realtime Database > ルール」で .read と .write が true になっているか確認してください。");
+        throw new Error('アクセス拒否（ステータス: ' + stRes.status + '）。Firebaseの「Realtime Database > ルール」で .read と .write が true になっているか確認してください。');
       }
 
       const stationsData = (await stRes.json()) || {};
@@ -247,12 +253,17 @@
       document.getElementById('error-box').style.display = 'none';
       renderAll(stationsData, logsData);
     } catch (err) {
-      showError("データベース通信エラー: " + err.message);
+      showError('データベース通信エラー: ' + err.message);
     }
   }
 
   // ① 自局登録ボタン
-  document.getElementById('btn-reg').addEventListener('click', async function() {
+  async function handleReg() {
+    if (cleanDbUrl.includes('★ここに') || !cleanDbUrl.startsWith('https://')) {
+      alert('DATABASE_URL が設定されていません。画面上部の赤い案内をご確認ください。');
+      return;
+    }
+
     const rawCall = document.getElementById('reg-call').value.trim().toUpperCase();
     const place = document.getElementById('reg-place').value.trim();
     const coordStr = document.getElementById('reg-coord').value.trim();
@@ -286,17 +297,22 @@
         })
       });
 
-      if (!res.ok) throw new Error("書き込み拒否（ルール設定を確認してください）");
+      if (!res.ok) throw new Error('書き込み拒否（Firebaseのルール設定を確認してください）');
 
       alert(rawCall + ' の運用場所（' + place + '）を登録しました！');
       loadAllData();
     } catch (e) {
       showError('登録エラー: ' + e.message);
     }
-  });
+  }
 
   // ② 交信報告ボタン
-  document.getElementById('btn-qso').addEventListener('click', async function() {
+  async function handleQso() {
+    if (cleanDbUrl.includes('★ここに') || !cleanDbUrl.startsWith('https://')) {
+      alert('DATABASE_URL が設定されていません。');
+      return;
+    }
+
     const myCall = document.getElementById('reg-call').value.trim().toUpperCase();
     const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
     const timeVal = document.getElementById('log-time').value;
@@ -328,17 +344,3 @@
         })
       });
 
-      if (!res.ok) throw new Error("送信拒否（ルール設定を確認してください）");
-
-      document.getElementById('log-target-call').value = '';
-      alert(myCall + ' → ' + targetCall + ' の交信を送信しました。');
-      loadAllData();
-    } catch (e) {
-      showError('送信エラー: ' + e.message);
-    }
-  });
-
-  document.getElementById('btn-refresh').addEventListener('click', loadAllData);
-
-  function calcDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
