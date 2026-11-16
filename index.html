@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>リアルタイム無線交信（QSO）マッチングマップ</title>
-<link rel="stylesheet" href="https://unpkg.com" />
 <link rel="stylesheet" href="leaflet.css" />
-<script src="https://unpkg.com"></script>
 <script src="leaflet.js"></script>
 <style>
   body { font-family: sans-serif; color: #333; max-width: 960px; margin: 0 auto; padding: 10px; }
@@ -82,8 +80,13 @@ function showErr(msg) {
 function init() {
   if (typeof L !== "undefined") {
     map = L.map("map").setView([36.2048, 138.2529], 6);
-    L.tileLayer("https://gsi.go.jp{z}/{x}/{y}.png").addTo(map);
+    L.tileLayer("https://gsi.go.jp{z}/{x}/{y}.png", {
+      attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+    }).addTo(map);
     layerGroup = L.layerGroup().addTo(map);
+    setTimeout(function() { map.invalidateSize(); }, 300);
+  } else {
+    showErr("leaflet.js が読み込めませんでした。GitHubに leaflet.js が正しくアップロードされているか確認してください。");
   }
   var now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -94,14 +97,13 @@ function init() {
   setInterval(loadAllData, 10000);
 }
 
-// JSONP通信関数（ブラウザ制限を完全回避）
 function callGasJsonp(params, onSuccess) {
   var cbName = "gasCb_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
   var script = document.createElement("script");
   var timer = setTimeout(function() {
     delete window[cbName];
     if (script.parentNode) script.parentNode.removeChild(script);
-    showErr("応答タイムアウト: Apps Scriptのデプロイ設定で「アクセスできるユーザー」が「全員」になっているか確認してください。");
+    showErr("応答タイムアウト: Apps Scriptのデプロイ設定を確認してください。");
   }, 15000);
 
   window[cbName] = function(data) {
@@ -115,7 +117,7 @@ function callGasJsonp(params, onSuccess) {
     clearTimeout(timer);
     delete window[cbName];
     if (script.parentNode) script.parentNode.removeChild(script);
-    showErr("スクリプト読込エラー: URLが正しいか、Apps Scriptが「全員」公開で新バージョンデプロイされているか確認してください。");
+    showErr("通信エラー: URLやデプロイ設定を確認してください。");
   };
 
   script.src = GAS_URL + "?" + params + "&callback=" + cbName;
