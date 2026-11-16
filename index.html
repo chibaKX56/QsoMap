@@ -82,10 +82,11 @@
     .error-box {
       background: #fee2e2;
       color: #b91c1c;
-      padding: 10px 15px;
+      padding: 12px 15px;
       border-radius: 6px;
       margin-bottom: 15px;
       font-size: 13px;
+      line-height: 1.5;
       display: none;
     }
     table.match-table {
@@ -128,13 +129,9 @@
       <button type="button" id="btn-reg" class="btn btn-station">自局の運用場所を登録・更新</button>
     </div>
 
-    <!-- 2. 交信相手の報告 -->
+    <!-- 2. 交信相手の報告（自局コールサイン欄を削除済み） -->
     <div class="card">
       <h3>② 交信相手の入力（相互一致でライン描画）</h3>
-      <div class="form-group">
-        <label>自局コールサイン *</label>
-        <input type="text" id="log-my-call" placeholder="例: JQ1XYZ/1">
-      </div>
       <div class="form-group">
         <label>相手局コールサイン *</label>
         <input type="text" id="log-target-call" placeholder="例: JJ1AAA/1">
@@ -143,13 +140,16 @@
         <label>交信時間 *</label>
         <input type="datetime-local" id="log-time">
       </div>
+      <p style="font-size: 12px; color: #64748b; margin: 0 0 10px 0;">
+        ※①で入力した自局コールサインとして送信されます。
+      </p>
       <button type="button" id="btn-qso" class="btn btn-qso">交信ログを送信する</button>
     </div>
   </div>
 
   <!-- ステータス表示 -->
   <div class="status-bar" id="status-bar">
-    システム状態: <span id="sys-status">初期化中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
+    システム状態: <span id="sys-status">確認中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
   </div>
 
   <!-- 地図エリア -->
@@ -167,7 +167,7 @@
       </tr>
     </thead>
     <tbody id="match-tbody">
-      <tr><td colspan="4" style="text-align:center; color:#64748b;">双方の入力が一致するとここに表示されます</td></tr>
+      <tr><td colspan="4" style="text-align:center; color:#64748b;">双方の入力と運用場所登録が揃うとここに表示されます</td></tr>
     </tbody>
   </table>
 </div>
@@ -183,8 +183,8 @@
   const showError = (msg) => {
     const box = document.getElementById('error-box');
     box.style.display = 'block';
-    box.innerHTML = '<b>⚠️ エラー詳細:</b> ' + msg;
-    document.getElementById('sys-status').textContent = '設定エラー';
+    box.innerHTML = '<b>⚠️ 設定が必要です:</b><br>' + msg;
+    document.getElementById('sys-status').textContent = '未接続（設定待ち）';
   };
 
   // =========================================================
@@ -202,7 +202,7 @@
 };
   // =========================================================
 
-  // 地図初期化（Firebaseより先に動かして地図を確実に表示）
+  // 地図初期化
   const map = L.map('map').setView([36.2048, 138.2529], 6);
   L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
     attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
@@ -218,23 +218,22 @@
   const savedCall = localStorage.getItem('my_qso_callsign');
   if (savedCall) {
     document.getElementById('reg-call').value = savedCall;
-    document.getElementById('log-my-call').value = savedCall;
   }
 
   // Firebase接続初期化
   let db = null;
   try {
     if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-      showError("コード内の firebaseConfig が初期値（YOUR_API_KEY）のままです。Firebaseの設定値に書き換えてください。");
+      showError("コード内の <b>firebaseConfig</b> が初期値のままです。GoogleのFirebaseでデータベースを作成し、設定値を貼り付けてください。");
     } else if (!firebaseConfig.databaseURL) {
-      showError("firebaseConfig に databaseURL が含まれていません。Realtime Database のURLを追加してください。");
+      showError("firebaseConfig に <b>databaseURL</b> がありません。Realtime Database のURLを追加してください。");
     } else {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
       document.getElementById('sys-status').textContent = 'オンライン接続完了';
     }
   } catch (err) {
-    showError("Firebaseの初期化に失敗しました: " + err.message);
+    showError("Firebaseの初期化エラー: " + err.message);
   }
 
   const encodeCall = (call) => call.trim().toUpperCase().replace(/\//g, '_');
@@ -242,7 +241,7 @@
   // ① 自局の運用場所登録処理
   document.getElementById('btn-reg').addEventListener('click', async () => {
     if (!db) {
-      alert('Firebaseが正しく接続されていないため保存できません。画面上部の赤枠のエラーを確認してください。');
+      alert('Firebaseの設定が完了していないため登録できません。画面上の赤い案内をご確認ください。');
       return;
     }
 
@@ -265,7 +264,6 @@
     }
 
     localStorage.setItem('my_qso_callsign', rawCall);
-    document.getElementById('log-my-call').value = rawCall;
 
     try {
       await set(ref(db, 'stations/' + encodeCall(rawCall)), {
@@ -277,23 +275,27 @@
       });
       alert(`${rawCall} の運用場所（${place}）を登録しました！`);
     } catch (e) {
-      showError('データベース書き込み拒否: Firebaseの「Realtime Database > ルール」で .write が true になっているか確認してください。(' + e.message + ')');
+      showError('データベースへの保存が拒否されました。Firebaseの「Realtime Database > ルール」で .write を true にしてください。(' + e.message + ')');
     }
   });
 
-  // ② 交信相手の報告処理
+  // ② 交信相手の報告処理（①の自局コールサインを自動使用）
   document.getElementById('btn-qso').addEventListener('click', async () => {
     if (!db) {
-      alert('Firebaseが正しく接続されていないため送信できません。');
+      alert('Firebaseの設定が完了していないため送信できません。');
       return;
     }
 
-    const myCall = document.getElementById('log-my-call').value.trim().toUpperCase();
+    const myCall = document.getElementById('reg-call').value.trim().toUpperCase();
     const targetCall = document.getElementById('log-target-call').value.trim().toUpperCase();
     const timeVal = document.getElementById('log-time').value;
 
-    if (!myCall || !targetCall || !timeVal) {
-      alert('自局コールサイン、相手局コールサイン、交信時間を入力してください。');
+    if (!myCall) {
+      alert('先に左側の「① 自局コールサイン」を入力してください。');
+      return;
+    }
+    if (!targetCall || !timeVal) {
+      alert('相手局コールサインと交信時間を入力してください。');
       return;
     }
     if (myCall === targetCall) {
@@ -311,7 +313,7 @@
         createdAt: Date.now()
       });
       document.getElementById('log-target-call').value = '';
-      alert(`${targetCall} との交信を送信しました。`);
+      alert(`${myCall} → ${targetCall} の交信を送信しました。`);
     } catch (e) {
       showError('送信エラー: ' + e.message);
     }
@@ -332,3 +334,5 @@
 
   if (db) {
     onValue(ref(db, 'stations'), (snapshot) => {
+      stationsData = snapshot.val() || {};
+      renderAll();
