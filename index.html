@@ -107,7 +107,6 @@
 <body>
 
 <div class="qso-app">
-  <!-- エラー通知表示エリア -->
   <div id="error-box" class="error-box"></div>
 
   <div class="panel-grid">
@@ -129,7 +128,7 @@
       <button type="button" id="btn-reg" class="btn btn-station">自局の運用場所を登録・更新</button>
     </div>
 
-    <!-- 2. 交信相手の報告（自局コールサイン欄を削除済み） -->
+    <!-- 2. 交信相手の報告 -->
     <div class="card">
       <h3>② 交信相手の入力（相互一致でライン描画）</h3>
       <div class="form-group">
@@ -147,15 +146,12 @@
     </div>
   </div>
 
-  <!-- ステータス表示 -->
   <div class="status-bar" id="status-bar">
-    システム状態: <span id="sys-status">確認中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
+    システム状態: <span id="sys-status">プログラム起動中...</span> ｜ 登録局数: <span id="stat-stations">0</span>局 ｜ 成立ライン数: <span id="stat-matches">0</span>本
   </div>
 
-  <!-- 地図エリア -->
   <div id="map"></div>
 
-  <!-- 成立した交信一覧 -->
   <h3>成立した交信一覧（双方入力済み）</h3>
   <table class="match-table">
     <thead>
@@ -172,24 +168,36 @@
   </table>
 </div>
 
-<!-- Leaflet JS -->
+<!-- 1. まず地図とボタンを確実に動かす通常スクリプト -->
 <script src="https://unpkg.com"></script>
-
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://gstatic.com";
-  import { getDatabase, ref, set, push, onValue } from "https://gstatic.com";
-
-  const showError = (msg) => {
+<script>
+  window.onerror = function(msg, url, line) {
     const box = document.getElementById('error-box');
     box.style.display = 'block';
-    box.innerHTML = '<b>⚠️ 設定が必要です:</b><br>' + msg;
-    document.getElementById('sys-status').textContent = '未接続（設定待ち）';
+    box.innerHTML = '<b>⚠️ コード記述エラー（' + line + '行目）:</b><br>' + msg + '<br>※Firebase設定を貼り付けた際に、カンマやカッコが消えていないか確認してください。';
+    document.getElementById('sys-status').textContent = 'コードエラー停止';
   };
 
-  // =========================================================
-  // ★ここにFirebaseコンソールで取得した設定を貼り付けてください
-  // =========================================================
+  window.map = L.map('map').setView([36.2048, 138.2529], 6);
+  L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
+    attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
+  }).addTo(window.map);
+  window.layerGroup = L.layerGroup().addTo(window.map);
+
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('log-time').value = now.toISOString().slice(0, 16);
+
+  const savedCall = localStorage.getItem('my_qso_callsign');
+  if (savedCall) {
+    document.getElementById('reg-call').value = savedCall;
+  }
+  document.getElementById('sys-status').textContent = '地図表示完了（Firebase接続待ち）';
+</script>
+
+<!-- 2. Firebase設定エリア（★ここだけを書き換えてください） -->
+<script>
+  // ★ここから下にFirebaseの const firebaseConfig = { ... }; を丸ごと貼り付けて上書きしてください
   const firebaseConfig = {
   apiKey: "AIzaSyCNfdXz9KhPsFDVMwsfyk-3JtDQjUo-cRs",
   authDomain: "communication-map-b30e3.firebaseapp.com",
@@ -200,48 +208,41 @@
   appId: "1:942567738907:web:702678d0071795878132be",
   measurementId: "G-7C3JNN1FYN"
 };
-  // =========================================================
+  // ★ここまで
+</script>
 
-  // 地図初期化
-  const map = L.map('map').setView([36.2048, 138.2529], 6);
-  L.tileLayer('https://gsi.go.jp{z}/{x}/{y}.png', {
-    attribution: "<a href='https://gsi.go.jp' target='_blank'>地理院タイル</a>"
-  }).addTo(map);
-  const layerGroup = L.layerGroup().addTo(map);
+<!-- 3. Firebase通信処理 -->
+<script type="module">
+  import { initializeApp } from "https://gstatic.com";
+  import { getDatabase, ref, set, push, onValue } from "https://gstatic.com";
 
-  // 現在時刻を初期セット
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById('log-time').value = now.toISOString().slice(0, 16);
+  const showError = (msg) => {
+    const box = document.getElementById('error-box');
+    box.style.display = 'block';
+    box.innerHTML = '<b>⚠️ Firebaseエラー:</b><br>' + msg;
+    document.getElementById('sys-status').textContent = '接続エラー';
+  };
 
-  // ブラウザ記憶の復元
-  const savedCall = localStorage.getItem('my_qso_callsign');
-  if (savedCall) {
-    document.getElementById('reg-call').value = savedCall;
-  }
-
-  // Firebase接続初期化
   let db = null;
   try {
-    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-      showError("コード内の <b>firebaseConfig</b> が初期値のままです。GoogleのFirebaseでデータベースを作成し、設定値を貼り付けてください。");
+    if (typeof firebaseConfig === 'undefined' || firebaseConfig.apiKey === "YOUR_API_KEY") {
+      showError("Firebaseの設定値（firebaseConfig）がまだ貼り付けられていません。");
     } else if (!firebaseConfig.databaseURL) {
-      showError("firebaseConfig に <b>databaseURL</b> がありません。Realtime Database のURLを追加してください。");
+      showError("firebaseConfig の中に <b>databaseURL</b> がありません。Realtime Database のURLを追記してください。");
     } else {
       const app = initializeApp(firebaseConfig);
       db = getDatabase(app);
       document.getElementById('sys-status').textContent = 'オンライン接続完了';
     }
   } catch (err) {
-    showError("Firebaseの初期化エラー: " + err.message);
+    showError("Firebase初期化エラー: " + err.message);
   }
 
   const encodeCall = (call) => call.trim().toUpperCase().replace(/\//g, '_');
 
-  // ① 自局の運用場所登録処理
   document.getElementById('btn-reg').addEventListener('click', async () => {
     if (!db) {
-      alert('Firebaseの設定が完了していないため登録できません。画面上の赤い案内をご確認ください。');
+      alert('Firebaseが接続されていないため登録できません。画面上の赤いエラー内容を確認してください。');
       return;
     }
 
@@ -275,14 +276,13 @@
       });
       alert(`${rawCall} の運用場所（${place}）を登録しました！`);
     } catch (e) {
-      showError('データベースへの保存が拒否されました。Firebaseの「Realtime Database > ルール」で .write を true にしてください。(' + e.message + ')');
+      showError('保存が拒否されました。Firebaseの「Realtime Database > ルール」が true になっているか確認してください。(' + e.message + ')');
     }
   });
 
-  // ② 交信相手の報告処理（①の自局コールサインを自動使用）
   document.getElementById('btn-qso').addEventListener('click', async () => {
     if (!db) {
-      alert('Firebaseの設定が完了していないため送信できません。');
+      alert('Firebaseが接続されていないため送信できません。');
       return;
     }
 
@@ -319,7 +319,6 @@
     }
   });
 
-  // 2点間の距離計算 (km)
   function calcDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
     const toRad = deg => deg * Math.PI / 180;
@@ -329,10 +328,3 @@
     return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
   }
 
-  let stationsData = {};
-  let logsData = {};
-
-  if (db) {
-    onValue(ref(db, 'stations'), (snapshot) => {
-      stationsData = snapshot.val() || {};
-      renderAll();
