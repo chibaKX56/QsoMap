@@ -3,47 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>リアルタイム無線交信（QSO）マッチングマップ</title>
+<title>無線交信（QSO）マッチングマップ</title>
 <script src="leaflet.js"></script>
 <style>
-  body { font-family: sans-serif; color: #333; max-width: 960px; margin: 0 auto; padding: 10px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 15px; }
-  .card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 15px; }
-  .card h3 { margin: 0 0 10px 0; font-size: 16px; border-bottom: 2px solid #0284c7; padding-bottom: 5px; }
-  .fg { margin-bottom: 10px; }
-  .fg label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 3px; }
-  .fg input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #94a3b8; border-radius: 4px; }
-  .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: bold; color: #fff; cursor: pointer; }
-  .btn-blue { background: #0284c7; }
-  .btn-green { background: #16a34a; }
-  .btn-gray { width: auto; padding: 5px 10px; background: #475569; font-size: 12px; }
-  #map { height: 480px; width: 100%; border-radius: 8px; border: 1px solid #94a3b8; margin-bottom: 15px; background: #aad3df; position: relative; overflow: hidden; }
-  .bar { background: #e0f2fe; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; color: #0369a1; display: flex; justify-content: space-between; align-items: center; }
-  .err { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; font-size: 13px; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
-  th { background: #f1f5f9; }
-  .leaflet-pane, .leaflet-tile, .leaflet-tile-container, .leaflet-pane > svg, .leaflet-layer { position: absolute; left: 0; top: 0; }
-  .leaflet-tile { visibility: hidden; max-width: none !important; }
-  .leaflet-tile-loaded { visibility: inherit; }
-  .leaflet-zoom-animated { transform-origin: 0 0; }
-  .leaflet-tile-pane { z-index: 200; }
-  .leaflet-overlay-pane { z-index: 400; }
-  .leaflet-tooltip-pane { z-index: 650; }
-  .leaflet-popup-pane { z-index: 700; }
-  .leaflet-top, .leaflet-bottom { position: absolute; z-index: 1000; pointer-events: none; }
-  .leaflet-top { top: 0; } .leaflet-left { left: 0; } .leaflet-bottom { bottom: 0; } .leaflet-right { right: 0; }
-  .leaflet-control { pointer-events: auto; background: #fff; border: 1px solid #ccc; margin: 8px; }
-  .leaflet-control-zoom a { display: block; width: 26px; height: 26px; line-height: 26px; text-align: center; text-decoration: none; color: #000; font-weight: bold; }
-  .leaflet-tooltip { position: absolute; padding: 2px 6px; background: #fff; border: 1px solid #e11d48; border-radius: 4px; white-space: nowrap; font-size: 12px; font-weight: bold; color: #be123c; pointer-events: none; }
-  .leaflet-popup { position: absolute; text-align: center; margin-bottom: 15px; }
-  .leaflet-popup-content-wrapper { padding: 8px 12px; background: #fff; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+body{font-family:sans-serif;color:#333;max-width:960px;margin:0 auto;padding:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:15px;margin-bottom:15px}
+.card{background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:15px}
+.card h3{margin:0 0 10px 0;font-size:16px;border-bottom:2px solid #0284c7;padding-bottom:5px}
+.fg{margin-bottom:10px}
+.fg label{display:block;font-size:12px;font-weight:bold;margin-bottom:3px}
+.fg input{width:100%;padding:8px;box-sizing:border-box;border:1px solid #94a3b8;border-radius:4px}
+.btn{width:100%;padding:10px;border:none;border-radius:4px;font-weight:bold;color:#fff;cursor:pointer}
+.btn-blue{background:#0284c7}
+.btn-green{background:#16a34a}
+.btn-gray{width:auto;padding:5px 10px;background:#475569;font-size:12px}
+#map{height:480px;width:100%;border-radius:8px;border:1px solid #94a3b8;margin-bottom:15px;background:#aad3df;position:relative;overflow:hidden}
+.bar{background:#e0f2fe;padding:10px;border-radius:6px;margin-bottom:15px;font-weight:bold;color:#0369a1;display:flex;justify-content:space-between;align-items:center}
+.err{background:#fee2e2;color:#b91c1c;padding:10px;border-radius:6px;margin-bottom:15px;display:none;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}
+th{background:#f1f5f9}
+.leaflet-pane,.leaflet-tile,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-layer{position:absolute;left:0;top:0}
+.leaflet-tile{visibility:hidden;max-width:none!important}
+.leaflet-tile-loaded{visibility:inherit}
+.leaflet-zoom-animated{transform-origin:0 0}
+.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+.leaflet-top{top:0}.leaflet-left{left:0}.leaflet-bottom{bottom:0}.leaflet-right{right:0}
+.leaflet-control{pointer-events:auto;background:#fff;border:1px solid #ccc;margin:8px}
+.leaflet-control-zoom a{display:block;width:26px;height:26px;line-height:26px;text-align:center;text-decoration:none;color:#000;font-weight:bold}
+.leaflet-tooltip{position:absolute;padding:2px 6px;background:#fff;border:1px solid #e11d48;border-radius:4px;white-space:nowrap;font-size:12px;font-weight:bold;color:#be123c;pointer-events:none}
+.leaflet-popup{position:absolute;text-align:center;margin-bottom:15px}
+.leaflet-popup-content-wrapper{padding:8px 12px;background:#fff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
 </style>
 </head>
 <body>
-
 <div id="err-box" class="err"></div>
-
 <div class="grid">
   <div class="card">
     <h3>① 自局の運用場所を登録（事前登録）</h3>
@@ -52,211 +47,113 @@
     <div class="fg"><label>運用場所の座標 (緯度, 経度) *</label><input type="text" id="reg-coord" placeholder="例: 38.5497, 140.0269"></div>
     <button type="button" class="btn btn-blue" onclick="handleReg()">自局の運用場所を登録・更新</button>
   </div>
-
   <div class="card">
     <h3>② 交信相手の入力（相互一致でライン描画）</h3>
     <div class="fg"><label>相手局コールサイン *</label><input type="text" id="log-target" placeholder="例: サイタマKM117"></div>
     <div class="fg"><label>交信時間 *</label><input type="datetime-local" id="log-time"></div>
-    <p style="font-size: 12px; color: #64748b; margin: 0 0 10px 0;">※①の自局コールサインとして送信されます。</p>
+    <p style="font-size:12px;color:#64748b;margin:0 0 10px 0">※①の自局コールサインとして送信されます。</p>
     <button type="button" class="btn btn-green" onclick="handleQso()">交信ログを送信する</button>
   </div>
 </div>
-
 <div class="bar">
   <div>状態: <span id="sys-status">起動中...</span> ｜ 登録: <span id="st-cnt">0</span>局 ｜ 成立: <span id="mt-cnt">0</span>本</div>
   <button type="button" class="btn btn-gray" onclick="loadAllData()">最新に更新</button>
 </div>
-
 <div id="map"></div>
-
 <h3>成立した交信一覧（双方入力済み）</h3>
 <table>
-  <thead>
-    <tr><th>局A</th><th>局B</th><th>交信距離</th><th>交信時間</th></tr>
-  </thead>
-  <tbody id="tbody">
-    <tr><td colspan="4" style="text-align:center;">双方の入力と運用場所登録が揃うとここに表示されます</td></tr>
-  </tbody>
+  <thead><tr><th>局A</th><th>局B</th><th>交信距離</th><th>交信時間</th></tr></thead>
+  <tbody id="tbody"><tr><td colspan="4" style="text-align:center">双方の入力と運用場所登録が揃うとここに表示されます</td></tr></tbody>
 </table>
-
 <script>
-var GAS_URL = "https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec";
-var map = null;
-var layerGroup = null;
-
-function showErr(msg) {
-  var b = document.getElementById("err-box");
-  b.style.display = "block";
-  b.innerHTML = "⚠️ " + msg;
-  document.getElementById("sys-status").textContent = "エラー";
-}
-
-function init() {
-  if (typeof L !== "undefined") {
-    map = L.map("map").setView([36.8, 139.5], 6);
-    L.tileLayer("https://openstreetmap.org{z}/{x}/{y}.png", {
-      attribution: "OpenStreetMap"
-    }).addTo(map);
-    layerGroup = L.layerGroup().addTo(map);
-    setTimeout(function() { map.invalidateSize(); }, 400);
+var GAS_URL="https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec";
+var map=null,layerGroup=null;
+function showErr(m){var b=document.getElementById("err-box");b.style.display="block";b.innerHTML="⚠️ "+m;document.getElementById("sys-status").textContent="エラー";}
+function init(){
+  if(typeof L!=="undefined"){
+    map=L.map("map").setView([36.8,139.5],6);
+    L.tileLayer("https://openstreetmap.org{z}/{x}/{y}.png",{attribution:"OpenStreetMap"}).addTo(map);
+    layerGroup=L.layerGroup().addTo(map);
+    setTimeout(function(){map.invalidateSize();},400);
   }
-  var now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  document.getElementById("log-time").value = now.toISOString().slice(0, 16);
-  var saved = localStorage.getItem("my_call");
-  if (saved) document.getElementById("reg-call").value = saved;
-  loadAllData();
-  setInterval(loadAllData, 10000);
+  var now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  document.getElementById("log-time").value=now.toISOString().slice(0,16);
+  var s=localStorage.getItem("my_call");if(s)document.getElementById("reg-call").value=s;
+  loadAllData();setInterval(loadAllData,10000);
 }
-
-function callGasJsonp(params, onSuccess) {
-  var cbName = "gasCb_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-  var script = document.createElement("script");
-  var timer = setTimeout(function() {
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    showErr("応答タイムアウト: Apps Scriptのデプロイ設定を確認してください。");
-  }, 15000);
-
-  window[cbName] = function(data) {
-    clearTimeout(timer);
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    onSuccess(data);
-  };
-
-  script.onerror = function() {
-    clearTimeout(timer);
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    showErr("通信エラー: URLやデプロイ設定を確認してください。");
-  };
-
-  script.src = GAS_URL + "?" + params + "&callback=" + cbName;
-  document.body.appendChild(script);
+function callGas(p,cb){
+  var n="cb_"+Date.now()+"_"+Math.floor(Math.random()*9999);
+  var sc=document.createElement("script");
+  var tm=setTimeout(function(){delete window[n];if(sc.parentNode)sc.parentNode.removeChild(sc);showErr("応答タイムアウト");},15000);
+  window[n]=function(d){clearTimeout(tm);delete window[n];if(sc.parentNode)sc.parentNode.removeChild(sc);cb(d);};
+  sc.onerror=function(){clearTimeout(tm);delete window[n];if(sc.parentNode)sc.parentNode.removeChild(sc);showErr("通信エラー");};
+  sc.src=GAS_URL+"?"+p+"&callback="+n;document.body.appendChild(sc);
 }
-
-function loadAllData() {
-  callGasJsonp("action=read", function(data) {
-    document.getElementById("sys-status").textContent = "接続完了";
-    document.getElementById("err-box").style.display = "none";
-    render(data.stations || [], data.logs || []);
+function loadAllData(){
+  callGas("action=read",function(d){
+    document.getElementById("sys-status").textContent="接続完了";
+    document.getElementById("err-box").style.display="none";
+    render(d.stations||[],d.logs||[]);
   });
 }
-
-function handleReg() {
-  var call = document.getElementById("reg-call").value.trim().toUpperCase();
-  var place = document.getElementById("reg-place").value.trim();
-  var coord = document.getElementById("reg-coord").value.trim();
-  if (!call || !place || !coord) {
-    alert("コールサイン、運用場所、座標をすべて入力してください。");
-    return;
-  }
-  var p = coord.split(",");
-  var lat = parseFloat(p.shift());
-  var lon = parseFloat(p.shift());
-  if (isNaN(lat) || isNaN(lon)) {
-    alert("座標は「38.5497, 140.0269」の形式で入力してください。");
-    return;
-  }
-  localStorage.setItem("my_call", call);
-  document.getElementById("sys-status").textContent = "登録中...";
-
-  var query = "action=reg&call=" + encodeURIComponent(call) +
-              "&place=" + encodeURIComponent(place) +
-              "&lat=" + encodeURIComponent(lat) +
-              "&lon=" + encodeURIComponent(lon);
-
-  callGasJsonp(query, function() {
-    alert(call + " を登録しました！");
-    loadAllData();
-  });
+function handleReg(){
+  var c=document.getElementById("reg-call").value.trim().toUpperCase();
+  var pl=document.getElementById("reg-place").value.trim();
+  var co=document.getElementById("reg-coord").value.trim();
+  if(!c||!pl||!co){alert("すべて入力してください");return;}
+  var p=co.split(","),lat=parseFloat(p.shift()),lon=parseFloat(p.shift());
+  if(isNaN(lat)||isNaN(lon)){alert("座標は「38.5497, 140.0269」の形式で入力してください");return;}
+  localStorage.setItem("my_call",c);document.getElementById("sys-status").textContent="登録中...";
+  var q="action=reg&call="+encodeURIComponent(c)+"&place="+encodeURIComponent(pl)+"&lat="+encodeURIComponent(lat)+"&lon="+encodeURIComponent(lon);
+  callGas(q,function(){alert(c+" を登録しました！");loadAllData();});
 }
-
-function handleQso() {
-  var myCall = document.getElementById("reg-call").value.trim().toUpperCase();
-  var tgCall = document.getElementById("log-target").value.trim().toUpperCase();
-  var tm = document.getElementById("log-time").value;
-  if (!myCall) {
-    alert("先に①の自局コールサインを入力してください。");
-    return;
-  }
-  if (!tgCall || !tm) {
-    alert("相手局コールサインと交信時間を入力してください。");
-    return;
-  }
-  if (myCall === tgCall) {
-    alert("自局と相手局に同じコールサインは指定できません。");
-    return;
-  }
-  localStorage.setItem("my_call", myCall);
-  document.getElementById("sys-status").textContent = "送信中...";
-
-  var query = "action=qso&from=" + encodeURIComponent(myCall) +
-              "&to=" + encodeURIComponent(tgCall) +
-              "&time=" + encodeURIComponent(tm.replace("T", " "));
-
-  callGasJsonp(query, function() {
-    document.getElementById("log-target").value = "";
-    alert(myCall + " → " + tgCall + " を送信しました！");
-    loadAllData();
-  });
+function handleQso(){
+  var mc=document.getElementById("reg-call").value.trim().toUpperCase();
+  var tc=document.getElementById("log-target").value.trim().toUpperCase();
+  var tm=document.getElementById("log-time").value;
+  if(!mc||!tc||!tm){alert("必須項目を入力してください");return;}
+  if(mc===tc){alert("同じコールサインは指定できません");return;}
+  localStorage.setItem("my_call",mc);document.getElementById("sys-status").textContent="送信中...";
+  var q="action=qso&from="+encodeURIComponent(mc)+"&to="+encodeURIComponent(tc)+"&time="+encodeURIComponent(tm.replace("T"," "));
+  callGas(q,function(){document.getElementById("log-target").value="";alert(mc+" → "+tc+" を送信しました！");loadAllData();});
 }
-
-function calcDist(lat1, lon1, lat2, lon2) {
-  var R = 6371;
-  var rad = function(d) { return d * Math.PI / 180; };
-  var dLat = rad(lat2 - lat1);
-  var dLon = rad(lon2 - lon1);
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-  return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+function calcDist(a,b,c,d){
+  var R=6371,r=function(v){return v*Math.PI/180;};
+  var dLat=r(c-a),dLon=r(d-b);
+  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return (R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))).toFixed(1);
 }
-
-function render(stationsList, logsList) {
-  if (!layerGroup) return;
+function render(stList,lgList){
+  if(!layerGroup)return;
   layerGroup.clearLayers();
-  var stMap = {};
-  stationsList.forEach(function(st) {
-    if (!st || !st.callsign) return;
-    stMap[st.callsign] = st;
-    L.circleMarker([st.lat, st.lon], {
-      radius: 8, fillColor: "#0284c7", color: "#fff", weight: 2, fillOpacity: 0.9
-    }).bindPopup("<b>" + st.callsign + "</b><br>運用地: " + st.place).addTo(layerGroup);
+  var sm={};
+  stList.forEach(function(s){
+    if(!s||!s.callsign)return;sm[s.callsign]=s;
+    L.circleMarker([s.lat,s.lon],{radius:8,fillColor:"#0284c7",color:"#fff",weight:2,fillOpacity:0.9}).bindPopup("<b>"+s.callsign+"</b><br>"+s.place).addTo(layerGroup);
   });
-  document.getElementById("st-cnt").textContent = Object.keys(stMap).length;
-
-  var pairs = new Map();
-  logsList.forEach(function(a) {
-    if (!a) return;
-    var b = logsList.find(function(x) { return x && x.from === a.to && x.to === a.from; });
-    if (b) {
-      var k = [a.from, a.to].sort().join("__");
-      if (!pairs.has(k)) pairs.set(k, { a: a, b: b });
+  document.getElementById("st-cnt").textContent=Object.keys(sm).length;
+  var pairs=new Map();
+  lgList.forEach(function(a){
+    if(!a)return;
+    var b=lgList.find(function(x){return x&&x.from===a.to&&x.to===a.from;});
+    if(b){var k=[a.from,a.to].sort().join("__");if(!pairs.has(k))pairs.set(k,{a:a,b:b});}
+  });
+  var tb=document.getElementById("tbody");tb.innerHTML="";var cnt=0;
+  pairs.forEach(function(p){
+    var sA=sm[p.a.from],sB=sm[p.b.from];
+    if(sA&&sB){
+      cnt++;var dist=calcDist(sA.lat,sA.lon,sB.lat,sB.lon);
+      L.polyline([[sA.lat,sA.lon],[sB.lat,sB.lon]],{color:"#e11d48",weight:4}).addTo(layerGroup);
+      L.tooltip({permanent:true,direction:"center"}).setLatLng([(sA.lat+sB.lat)/2,(sA.lon+sB.lon)/2]).setContent(dist+" km").addTo(layerGroup);
+      var tr=document.createElement("tr");
+      tr.innerHTML="<td>"+sA.callsign+" ("+sA.place+")</td><td>"+sB.callsign+" ("+sB.place+")</td><td><b>"+dist+" km</b></td><td>"+p.a.from+": "+p.a.time+"<br>"+p.b.from+": "+p.b.time+"</td>";
+      tb.appendChild(tr);
     }
   });
-
-  var tbody = document.getElementById("tbody");
-tbody.innerHTML = "";
-var cnt = 0;
-pairs.forEach(function(p) {
-var stA = stMap[p.a.from];
-var stB = stMap[p.b.from];
-if (stA && stB) {
-cnt++;
-var dist = calcDist(stA.lat, stA.lon, stB.lat, stB.lon);
-L.polyline([[stA.lat, stA.lon], [stB.lat, stB.lon]], { color: "#e11d48", weight: 4 }).addTo(layerGroup);
-var mLat = (stA.lat + stB.lat) / 2;
-var mLon = (stA.lon + stB.lon) / 2;
-L.tooltip({ permanent: true, direction: "center" }).setLatLng([mLat, mLon]).setContent(dist + " km").addTo(layerGroup);
-var tr = document.createElement("tr");
-tr.innerHTML = "" + stA.callsign + " (" + stA.place + ")" + stB.callsign + " (" + stB.place + ")" + dist + " km" + p.a.from + ": " + p.a.time + "
-" + p.b.from + ": " + p.b.time + "";
-tbody.appendChild(tr);
-}
-});
-document.getElementById("mt-cnt").textContent = cnt;
-if (cnt === 0) {
-tbody.innerHTML = '双方の入力と運用場所登録が揃うとここに表示されます';
-}
+  document.getElementById("mt-cnt").textContent=cnt;
+  if(cnt===0)tb.innerHTML='<tr><td colspan="4" style="text-align:center">双方の入力と運用場所登録が揃うとここに表示されます</td></tr>';
 }
 init();
+</script>
+</body>
+</html>
