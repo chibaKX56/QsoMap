@@ -72,8 +72,9 @@ function showErr(m){var b=document.getElementById("err-box");b.style.display="bl
 function init(){
   if(typeof L!=="undefined"){
     map=L.map("map").setView([36.8,139.5],6);
-    var MyTile=L.TileLayer.extend({getTileUrl:function(c){return "https://gsi.go.jp"+this._getZoomForUrl()+"/"+c.x+"/"+c.y+".png";}});
-new MyTile({attribution:"地理院タイル"}).addTo(map);
+    fetch("japan.geojson").then(function(r){return r.json();}).then(function(geo){
+  L.geoJSON(geo,{style:{color:"#64748b",weight:1,fillColor:"#ffffff",fillOpacity:1}}).addTo(map).bringToBack();
+});
     layerGroup=L.layerGroup().addTo(map);
     setTimeout(function(){map.invalidateSize();},400);
   }
