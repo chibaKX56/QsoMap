@@ -17,15 +17,15 @@ body{font-family:sans-serif;color:#333;max-width:960px;margin:0 auto;padding:10p
 .btn-blue{background:#0284c7}
 .btn-green{background:#16a34a}
 .btn-gray{width:auto;padding:5px 10px;background:#475569;font-size:12px}
-#map{height:480px;width:100%;border-radius:8px;border:1px solid #94a3b8;margin-bottom:15px;background:#aad3df;position:relative;overflow:hidden}
-.bar{background:#e0f2fe;padding:10px;border-radius:6px;margin-bottom:15px;font-weight:bold;color:#0369a1;display:flex;justify-content:space-between;align-items:center}
+#map{height:480px;width:100%;border-radius:8px;border:1px solid #94a3b8;margin-bottom:15px;background:#bae6fd;position:relative;overflow:hidden}
+.bar{background:#e0f2fe;padding:10px;border-radius:6px;margin-bottom:15px;font-weight:bold;color:#0369a1;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
 .err{background:#fee2e2;color:#b91c1c;padding:10px;border-radius:6px;margin-bottom:15px;display:none;font-size:13px}
-table{width:100%;border-collapse:collapse;font-size:14px}
+h3.sec-title{margin:20px 0 8px 0;font-size:16px;color:#0f172a}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px}
 th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}
 th{background:#f1f5f9}
+.wait-badge{display:inline-block;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold}
 .leaflet-pane,.leaflet-tile,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-layer{position:absolute;left:0;top:0}
-.leaflet-tile{visibility:visible!important;max-width:none!important}
-.leaflet-tile-loaded{visibility:inherit}
 .leaflet-zoom-animated{transform-origin:0 0}
 .leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
 .leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
@@ -55,16 +55,26 @@ th{background:#f1f5f9}
     <button type="button" class="btn btn-green" onclick="handleQso()">交信ログを送信する</button>
   </div>
 </div>
+
 <div class="bar">
-  <div>状態: <span id="sys-status">起動中...</span> ｜ 登録: <span id="st-cnt">0</span>局 ｜ 成立: <span id="mt-cnt">0</span>本</div>
+  <div>状態: <span id="sys-status">起動中...</span> ｜ 登録: <span id="st-cnt">0</span>局 ｜ 成立: <span id="mt-cnt">0</span>本 ｜ 入力待ち: <span id="wt-cnt">0</span>件</div>
   <button type="button" class="btn btn-gray" onclick="loadAllData()">最新に更新</button>
 </div>
+
 <div id="map"></div>
-<h3>成立した交信一覧（双方入力済み）</h3>
+
+<h3 class="sec-title">✅ 成立した交信一覧（双方入力済み）</h3>
 <table>
   <thead><tr><th>局A</th><th>局B</th><th>交信距離</th><th>交信時間</th></tr></thead>
   <tbody id="tbody"><tr><td colspan="4" style="text-align:center">双方の入力と運用場所登録が揃うとここに表示されます</td></tr></tbody>
 </table>
+
+<h3 class="sec-title">⏳ 相手局の入力待ち一覧（片道ログ）</h3>
+<table>
+  <thead><tr><th>送信局（報告者）</th><th>交信相手（入力待ち）</th><th>報告された交信時間</th><th>ステータス</th></tr></thead>
+  <tbody id="wait-tbody"><tr><td colspan="4" style="text-align:center">入力待ちのログはありません</td></tr></tbody>
+</table>
+
 <script>
 var GAS_URL="https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec";
 var map=null,layerGroup=null;
@@ -73,8 +83,14 @@ function init(){
   if(typeof L!=="undefined"){
     map=L.map("map").setView([36.8,139.5],6);
     fetch("japan.geojson").then(function(r){return r.json();}).then(function(geo){
-  L.geoJSON(geo,{style:{color:"#64748b",weight:1,fillColor:"#ffffff",fillOpacity:1}}).addTo(map).bringToBack();
-});
+      L.geoJSON(geo,{
+        style:{color:"#65a30d",weight:1,fillColor:"#ecfccb",fillOpacity:1},
+        onEachFeature:function(f,ly){
+          var nm=(f.properties&&(f.properties.nam_ja||f.properties.name))||"";
+          if(nm)ly.bindTooltip(nm,{sticky:true});
+        }
+      }).addTo(map).bringToBack();
+    });
     layerGroup=L.layerGroup().addTo(map);
     setTimeout(function(){map.invalidateSize();},400);
   }
@@ -134,12 +150,27 @@ function render(stList,lgList){
     L.circleMarker([s.lat,s.lon],{radius:8,fillColor:"#0284c7",color:"#fff",weight:2,fillOpacity:0.9}).bindPopup("<b>"+s.callsign+"</b><br>"+s.place).addTo(layerGroup);
   });
   document.getElementById("st-cnt").textContent=Object.keys(sm).length;
+
   var pairs=new Map();
+  var oneWayList=[];
+  var seenOneWay=new Set();
+
   lgList.forEach(function(a){
-    if(!a)return;
+    if(!a||!a.from||!a.to)return;
     var b=lgList.find(function(x){return x&&x.from===a.to&&x.to===a.from;});
-    if(b){var k=[a.from,a.to].sort().join("__");if(!pairs.has(k))pairs.set(k,{a:a,b:b});}
+    if(b){
+      var k=[a.from,a.to].sort().join("__");
+      if(!pairs.has(k))pairs.set(k,{a:a,b:b});
+    }else{
+      var owKey=a.from+"__"+a.to;
+      if(!seenOneWay.has(owKey)){
+        seenOneWay.add(owKey);
+        oneWayList.push(a);
+      }
+    }
   });
+
+  // 1. 成立済みテーブル＆地図ライン描画
   var tb=document.getElementById("tbody");tb.innerHTML="";var cnt=0;
   pairs.forEach(function(p){
     var sA=sm[p.a.from],sB=sm[p.b.from];
@@ -148,14 +179,26 @@ function render(stList,lgList){
       L.polyline([[sA.lat,sA.lon],[sB.lat,sB.lon]],{color:"#e11d48",weight:4}).addTo(layerGroup);
       L.tooltip({permanent:true,direction:"center"}).setLatLng([(sA.lat+sB.lat)/2,(sA.lon+sB.lon)/2]).setContent(dist+" km").addTo(layerGroup);
       var tr=document.createElement("tr");
-      tr.innerHTML="<td>"+sA.callsign+" ("+sA.place+")</td><td>"+sB.callsign+" ("+sB.place+")</td><td><b>"+dist+" km</b></td><td>"+p.a.from+": "+p.a.time+"<br>"+p.b.from+": "+p.b.time+"</td>";
-      tb.appendChild(tr);
-    }
-  });
-  document.getElementById("mt-cnt").textContent=cnt;
-  if(cnt===0)tb.innerHTML='<tr><td colspan="4" style="text-align:center">双方の入力と運用場所登録が揃うとここに表示されます</td></tr>';
+tr.innerHTML=""+sA.callsign+" ("+sA.place+")"+sB.callsign+" ("+sB.place+")"+dist+" km"+p.a.from+": "+p.a.time+"
+"+p.b.from+": "+p.b.time+"";
+tb.appendChild(tr);
+}
+});
+document.getElementById("mt-cnt").textContent=cnt;
+if(cnt===0)tb.innerHTML='双方の入力と運用場所登録が揃うとここに表示されます';
+// 2. 片道ログ（相手局の入力待ち）テーブル描画
+var wtb=document.getElementById("wait-tbody");wtb.innerHTML="";
+document.getElementById("wt-cnt").textContent=oneWayList.length;
+if(oneWayList.length===0){
+wtb.innerHTML='現在、相手局の入力待ちログはありません';
+}else{
+oneWayList.forEach(function(w){
+var fromPlace=sm[w.from]?" ("+sm[w.from].place+")":"";
+var toPlace=sm[w.to]?" ("+sm[w.to].place+")":" (運用地未登録)";
+var tr=document.createElement("tr");
+tr.innerHTML=""+w.from+""+fromPlace+""+w.to+""+toPlace+""+w.time+"⏳ "+w.to+" の入力待ち";
+wtb.appendChild(tr);
+});
+}
 }
 init();
-</script>
-</body>
-</html>
