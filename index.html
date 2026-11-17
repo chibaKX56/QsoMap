@@ -82,7 +82,7 @@ function showErr(m){var b=document.getElementById("err-box");b.style.display="bl
 function init(){
   if(typeof L!=="undefined"){
     map=L.map("map").setView([36.8,139.5],6);
-    fetch("japan.geojson").then(function(r){return r.json();}).then(function(geo){
+    fetch("japan.json").then(function(r){return r.json();}).then(function(geo){
       L.geoJSON(geo,{
         style:{color:"#65a30d",weight:1,fillColor:"#ecfccb",fillOpacity:1},
         onEachFeature:function(f,ly){
@@ -150,11 +150,7 @@ function render(stList,lgList){
     L.circleMarker([s.lat,s.lon],{radius:8,fillColor:"#0284c7",color:"#fff",weight:2,fillOpacity:0.9}).bindPopup("<b>"+s.callsign+"</b><br>"+s.place).addTo(layerGroup);
   });
   document.getElementById("st-cnt").textContent=Object.keys(sm).length;
-
-  var pairs=new Map();
-  var oneWayList=[];
-  var seenOneWay=new Set();
-
+  var pairs=new Map(),oneWayList=[],seenOneWay=new Set();
   lgList.forEach(function(a){
     if(!a||!a.from||!a.to)return;
     var b=lgList.find(function(x){return x&&x.from===a.to&&x.to===a.from;});
@@ -163,14 +159,9 @@ function render(stList,lgList){
       if(!pairs.has(k))pairs.set(k,{a:a,b:b});
     }else{
       var owKey=a.from+"__"+a.to;
-      if(!seenOneWay.has(owKey)){
-        seenOneWay.add(owKey);
-        oneWayList.push(a);
-      }
+      if(!seenOneWay.has(owKey)){seenOneWay.add(owKey);oneWayList.push(a);}
     }
   });
-
-  // 1. 成立済みテーブル＆地図ライン描画
   var tb=document.getElementById("tbody");tb.innerHTML="";var cnt=0;
   pairs.forEach(function(p){
     var sA=sm[p.a.from],sB=sm[p.b.from];
@@ -186,7 +177,6 @@ tb.appendChild(tr);
 });
 document.getElementById("mt-cnt").textContent=cnt;
 if(cnt===0)tb.innerHTML='双方の入力と運用場所登録が揃うとここに表示されます';
-// 2. 片道ログ（相手局の入力待ち）テーブル描画
 var wtb=document.getElementById("wait-tbody");wtb.innerHTML="";
 document.getElementById("wt-cnt").textContent=oneWayList.length;
 if(oneWayList.length===0){
