@@ -9,13 +9,21 @@ function fmtT(t){
 }
 function err(s){var b=document.getElementById("err");b.style.display="block";b.innerHTML="⚠️ "+s;document.getElementById("st").textContent="エラー";}
 function gas(p,cb){
-  var n="c_"+Date.now()+"_"+Math.floor(Math.random()*999),s=document.createElement("script");
+  var n="c_"+Date.now()+"_"+Math.floor(Math.random()*9999),s=document.createElement("script");
   var t=setTimeout(function(){delete window[n];s.remove();err("タイムアウト");},15000);
   window[n]=function(d){clearTimeout(t);delete window[n];s.remove();cb(d);};
   s.onerror=function(){clearTimeout(t);delete window[n];s.remove();err("通信エラー");};
-  s.src=U+"?"+p+"&callback="+n;document.body.appendChild(s);
+  s.src=U+"?"+p+"&_t="+Date.now()+"&callback="+n;document.body.appendChild(s);
 }
-function load(){gas("action=read",function(d){document.getElementById("st").textContent="接続完了";document.getElementById("err").style.display="none";draw(d.stations||[],d.logs||[]);});}
+function load(){
+  document.getElementById("st").textContent="🔄 更新中...";
+  gas("action=read",function(d){
+    var n=new Date(),ts=("0"+n.getHours()).slice(-2)+":"+("0"+n.getMinutes()).slice(-2)+":"+("0"+n.getSeconds()).slice(-2);
+    document.getElementById("st").textContent="接続完了 ("+ts+")";
+    document.getElementById("err").style.display="none";
+    draw(d.stations||[],d.logs||[]);
+  });
+}
 function reg(){
   var c=document.getElementById("rc").value.trim().toUpperCase(),p=document.getElementById("rp").value.trim(),x=document.getElementById("rx").value.split(",");
   var la=parseFloat(x.shift()),lo=parseFloat(x.shift());
