@@ -3,7 +3,7 @@ var PAL=["#e11d48","#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#db2777","
 
 function fmtT(t){
   var s=String(t||""),mt=s.match(/(\d{1,2}):(\d{2})/);
-  if(mt)return("0"+mt).slice(-2)+":"+mt;
+  if(mt)return("0"+mt.slice(1,2).pop()).slice(-2)+":"+mt.slice(2,3).pop();
   var d=new Date(s);
   return!isNaN(d.getTime())?("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2):s;
 }
@@ -18,7 +18,7 @@ function gas(p,cb){
 function load(){gas("action=read",function(d){document.getElementById("st").textContent="接続完了";document.getElementById("err").style.display="none";draw(d.stations||[],d.logs||[]);});}
 function reg(){
   var c=document.getElementById("rc").value.trim().toUpperCase(),p=document.getElementById("rp").value.trim(),x=document.getElementById("rx").value.split(",");
-  var la=parseFloat(x),lo=parseFloat(x);
+  var la=parseFloat(x.shift()),lo=parseFloat(x.shift());
   if(!c||!p||isNaN(la)||isNaN(lo))return alert("正しく入力してください");
   localStorage.setItem("mc",c);document.getElementById("st").textContent="登録中...";
   gas("action=reg&call="+encodeURIComponent(c)+"&place="+encodeURIComponent(p)+"&lat="+la+"&lon="+lo,function(){alert("登録完了");load();});
