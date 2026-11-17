@@ -7,6 +7,7 @@
 <script src="leaflet.js"></script>
 <style>
 body{font-family:sans-serif;color:#333;max-width:960px;margin:0 auto;padding:10px}
+.date-header{background:#0f172a;color:#fff;padding:10px 15px;border-radius:8px;margin-bottom:12px;font-size:16px;font-weight:bold;display:flex;justify-content:space-between;align-items:center}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:15px;margin-bottom:15px}
 .card{background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:15px}
 .card h3{margin:0 0 10px;font-size:16px;border-bottom:2px solid #0284c7;padding-bottom:5px}
@@ -36,6 +37,10 @@ th{background:#f1f5f9}
 </style>
 </head>
 <body>
+<div class="date-header">
+  <span>📡 無線交信（QSO）マッチングマップ</span>
+  <span id="today-disp"></span>
+</div>
 <div id="err" class="err"></div>
 <div class="grid">
   <div class="card">
@@ -59,11 +64,18 @@ th{background:#f1f5f9}
 </div>
 <div id="map"></div>
 <h3>✅ 成立した交信一覧</h3>
-<table><thead><tr><th>局A</th><th>局B</th><th>距離</th><th>時間</th></tr></thead><tbody id="tb1"></tbody></table>
+<table><thead><tr><th>局A</th><th>局B</th><th>距離</th><th>交信時刻</th></tr></thead><tbody id="tb1"></tbody></table>
 <h3>⏳ 相手局の入力待ち一覧（片道ログ）</h3>
-<table><thead><tr><th>送信局</th><th>相手局（入力待ち）</th><th>報告時間</th><th>状態</th></tr></thead><tbody id="tb2"></tbody></table>
+<table><thead><tr><th>送信局</th><th>相手局（入力待ち）</th><th>報告時刻</th><th>状態</th></tr></thead><tbody id="tb2"></tbody></table>
 <script>
 var U="https://script.google.com/macros/s/AKfycbzekdUKLnK-3kNEC6eR-NvaLruIwMiZLJVjCyRmv0-77FCLZIkY0SRCL2Zif8VIfoEOZA/exec",m,lg;
+function fmtTime(t){
+  var s=String(t||""),mt=s.match(/(\d{1,2}):(\d{2})/);
+  if(mt)return("0"+mt[1]).slice(-2)+":"+mt[2];
+  var d=new Date(s);
+  if(!isNaN(d.getTime()))return("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+  return s;
+}
 function err(s){var b=document.getElementById("err");b.style.display="block";b.innerHTML="⚠️ "+s;document.getElementById("st").textContent="エラー";}
 function gas(p,cb){
   var n="c_"+Date.now()+"_"+Math.floor(Math.random()*999),s=document.createElement("script");
@@ -108,7 +120,7 @@ function draw(sl,ll){
       cnt++;var d=dst(A.lat,A.lon,B.lat,B.lon);
       L.polyline([[A.lat,A.lon],[B.lat,B.lon]],{color:"#e11d48",weight:4}).addTo(lg);
       L.tooltip({permanent:true,direction:"center"}).setLatLng([(A.lat+B.lat)/2,(A.lon+B.lon)/2]).setContent(d+" km").addTo(lg);
-      t1.innerHTML+="<tr><td>"+A.callsign+"("+A.place+")</td><td>"+B.callsign+"("+B.place+")</td><td><b>"+d+" km</b></td><td>"+p.a.from+":"+p.a.time+"<br>"+p.b.from+":"+p.b.time+"</td></tr>";
+      t1.innerHTML+="<tr><td>"+A.callsign+"("+A.place+")</td><td>"+B.callsign+"("+B.place+")</td><td><b>"+d+" km</b></td><td>"+p.a.from+": "+fmtTime(p.a.time)+"<br>"+p.b.from+": "+fmtTime(p.b.time)+"</td></tr>";
     }
   });
   document.getElementById("c2").textContent=cnt;
@@ -117,7 +129,7 @@ function draw(sl,ll){
   if(!ow.length)t2.innerHTML='<tr><td colspan="4" style="text-align:center">入力待ちなし</td></tr>';
   else ow.forEach(function(w){
     var p1=sm[w.from]?"("+sm[w.from].place+")":"",p2=sm[w.to]?"("+sm[w.to].place+")":"<small>(運用地未登録)</small>";
-    t2.innerHTML+="<tr><td><b>"+w.from+"</b>"+p1+"</td><td><b>"+w.to+"</b>"+p2+"</td><td>"+w.time+"</td><td><span class='wb'>⏳ "+w.to+" 待ち</span></td></tr>";
+    t2.innerHTML+="<tr><td><b>"+w.from+"</b>"+p1+"</td><td><b>"+w.to+"</b>"+p2+"</td><td>"+fmtTime(w.time)+"</td><td><span class='wb'>⏳ "+w.to+" 待ち</span></td></tr>";
   });
 }
 if(typeof L!=="undefined"){
@@ -127,7 +139,9 @@ if(typeof L!=="undefined"){
   });
   lg=L.layerGroup().addTo(m);setTimeout(function(){m.invalidateSize();},400);
 }
-var nw=new Date();nw.setMinutes(nw.getMinutes()-nw.getTimezoneOffset());
+var nw=new Date();
+document.getElementById("today-disp").textContent="📅 "+nw.getFullYear()+"年"+(nw.getMonth()+1)+"月"+nw.getDate()+"日";
+nw.setMinutes(nw.getMinutes()-nw.getTimezoneOffset());
 document.getElementById("tm").value=nw.toISOString().slice(0,16);
 var sv=localStorage.getItem("mc");if(sv)document.getElementById("rc").value=sv;
 load();setInterval(load,10000);
