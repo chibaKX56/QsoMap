@@ -7,32 +7,36 @@
 <script src="leaflet.js"></script>
 <style>
 *{box-sizing:border-box}
-body{font-family:sans-serif;color:#1e293b;max-width:960px;margin:0 auto;padding:8px;background:#f1f5f9}
-.header{background:#0f172a;color:#fff;padding:12px 14px;border-radius:8px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+body{font-family:sans-serif;color:#1e293b;max-width:960px;margin:0 auto;padding:8px;background:#f8fafc}
+.header{background:#e2e8f0;color:#0f172a;padding:12px 14px;border-radius:8px;border:1px solid #cbd5e1;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .header h1{margin:0;font-size:17px}
-.date-box{display:flex;align-items:center;gap:6px;background:#1e293b;padding:4px 8px;border-radius:6px;font-size:13px}
-.date-box input{background:#fff;border:none;border-radius:4px;padding:4px 6px;font-size:14px;font-weight:bold;color:#0f172a}
+.today-lbl{font-size:14px;font-weight:bold;color:#334155}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:10px}
 .card{background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px}
-.card h3{margin:0 0 10px;font-size:15px;border-bottom:2px solid #0284c7;padding-bottom:4px;color:#0f172a}
-.row2{display:grid;grid-template-columns:1fr 110px;gap:8px}
+.card h3{margin:0 0 10px;font-size:15px;border-bottom:2px solid #0284c7;padding-bottom:4px}
+.row2{display:grid;grid-template-columns:1fr 105px;gap:8px}
 .fg{margin-bottom:8px}.fg label{display:block;font-size:11px;font-weight:bold;margin-bottom:3px;color:#475569}
-.fg input{width:100%;padding:9px;border:1px solid #94a3b8;border-radius:6px;font-size:15px}
+.fg input,.fg select{width:100%;padding:9px;border:1px solid #94a3b8;border-radius:6px;font-size:15px;background:#fff}
 .btn{width:100%;padding:11px;border:none;border-radius:6px;font-weight:bold;font-size:15px;color:#fff;cursor:pointer}
 .btn-blue{background:#0284c7}.btn-green{background:#16a34a}
-.btn-reload{width:auto;padding:7px 14px;background:#0f172a;font-size:13px;border-radius:6px}
+.btn-reload{width:auto;padding:6px 12px;background:#0f172a;font-size:13px;border-radius:6px}
 .btn-del{background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer}
 #map{height:420px;width:100%;border-radius:8px;border:1px solid #94a3b8;margin-bottom:12px;background:#bae6fd;position:relative;overflow:hidden}
-.bar{background:#e0f2fe;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:13px;font-weight:bold;color:#0369a1;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.bar{background:#e0f2fe;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:13px;font-weight:bold;color:#0369a1;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .err{background:#fee2e2;color:#b91c1c;padding:10px;border-radius:6px;margin-bottom:10px;display:none;font-size:13px}
 h3.sec{margin:16px 0 6px;font-size:15px;color:#0f172a}
 .tbl-wrap{overflow-x:auto;background:#fff;border-radius:8px;border:1px solid #cbd5e1;margin-bottom:16px}
-table{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:420px}
 th,td{border-bottom:1px solid #e2e8f0;padding:8px;text-align:left}
 th{background:#f8fafc;color:#475569;font-weight:bold}
+.del-link{color:#0284c7;text-decoration:underline;font-weight:bold;cursor:pointer}
+.del-link:hover{color:#dc2626}
+.b-tag{display:inline-block;background:#e2e8f0;color:#0f172a;padding:1px 5px;border-radius:4px;font-size:11px;font-weight:bold;margin-right:4px}
 .wb{background:#fef3c7;color:#b45309;border:1px solid #f59e0b;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;white-space:nowrap}
-.c-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.c-bar{display:inline-block;width:28px;height:8px;border-radius:4px;vertical-align:middle}
 .rank-lbl{background:#1e293b!important;color:#fde047!important;border:1px solid #fde047!important;font-size:11px!important;padding:1px 5px!important}
+.past-box{background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:12px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.past-box select{padding:8px;border:1px solid #94a3b8;border-radius:6px;font-size:14px;font-weight:bold}
 .leaflet-pane,.leaflet-tile,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-layer{position:absolute;left:0;top:0}
 .leaflet-zoom-animated{transform-origin:0 0}
 .leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
@@ -48,45 +52,59 @@ th{background:#f8fafc;color:#475569;font-weight:bold}
 <body>
 <div class="header">
   <h1>📡 QSOマッチングマップ</h1>
-  <div class="date-box">
-    <span>📅 運用日:</span>
-    <input type="date" id="filter-date" onchange="renderCurrent()">
-  </div>
+  <div class="today-lbl" id="today-disp"></div>
 </div>
 <div id="err" class="err"></div>
 <div class="grid">
   <div class="card">
-    <h3>① 自局の運用場所を登録</h3>
+    <h3>① 自局の運用場所を登録（当日有効）</h3>
     <div class="row2">
       <div class="fg"><label>自局コールサイン *</label><input id="rc" placeholder="例: チバKX56"></div>
       <div class="fg"><label>4桁パスワード *</label><input id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="1234"></div>
     </div>
     <div class="fg"><label>運用場所名 *</label><input id="rp" placeholder="例: 月山山頂"></div>
     <div class="fg"><label>座標 (緯度, 経度) *</label><input id="rx" placeholder="例: 38.5497, 140.0269"></div>
-    <button class="btn btn-blue" onclick="reg()">運用場所を登録・更新</button>
+    <button class="btn btn-blue" onclick="reg()">運用場所を登録・移動更新</button>
   </div>
   <div class="card">
     <h3>② 交信相手の入力</h3>
-    <div class="fg"><label>相手局コールサイン *</label><input id="lt" placeholder="例: サイタマKM117"></div>
+    <div class="row2">
+      <div class="fg"><label>相手局コールサイン *</label><input id="lt" placeholder="例: サイタマKM117"></div>
+      <div class="fg"><label>バンド *</label>
+        <select id="band">
+          <option value="CB">CB</option>
+          <option value="DCR" selected>DCR</option>
+          <option value="LCR">LCR</option>
+          <option value="SLP">SLP</option>
+        </select>
+      </div>
+    </div>
     <div class="fg"><label>交信日時 *</label><input type="datetime-local" id="tm"></div>
     <p style="font-size:11px;color:#64748b;margin:0 0 8px">※①の自局コールサインで送信されます</p>
     <button class="btn btn-green" onclick="qso()">交信ログを送信</button>
   </div>
 </div>
+
 <div class="bar">
-  <div>状態:<span id="st">待機中</span>｜局:<span id="c1">0</span>｜成立:<span id="c2">0</span>｜待ち:<span id="c3">0</span></div>
   <button class="btn btn-reload" onclick="load()">🔄 更新</button>
+  <div>状態: <span id="st">待機中</span> ｜ 局: <span id="c1">0</span> ｜ 成立: <span id="c2">0</span> ｜ 待ち: <span id="c3">0</span></div>
 </div>
+
 <div id="map"></div>
 
-<h3 class="sec">🏆 数珠繋ぎランキング（一本道・重複なし）</h3>
-<div class="tbl-wrap"><table><thead><tr><th>順位</th><th>ルート</th><th>合計距離</th><th>リレー経路</th></tr></thead><tbody id="tb-rank"></tbody></table></div>
+<h3 class="sec">🏆 バンド別 数珠繋ぎランキング（一本道）</h3>
+<div class="tbl-wrap"><table><thead><tr><th>バンド</th><th>順位</th><th>線色</th><th>合計距離</th><th>リレー経路</th></tr></thead><tbody id="tb-rank"></tbody></table></div>
 
-<h3 class="sec">✅ 成立した交信一覧（区間別）</h3>
-<div class="tbl-wrap"><table><thead><tr><th>局A</th><th>局B</th><th>距離</th><th>成立時刻</th><th>操作</th></tr></thead><tbody id="tb1"></tbody></table></div>
+<h3 class="sec">✅ 成立した交信一覧（※コールサインクリックで削除）</h3>
+<div class="tbl-wrap"><table><thead><tr><th>バンド</th><th>局A</th><th>局B</th><th>距離</th><th>成立時刻</th></tr></thead><tbody id="tb1"></tbody></table></div>
 
 <h3 class="sec">⏳ 相手局の入力待ち一覧（片道ログ）</h3>
-<div class="tbl-wrap"><table><thead><tr><th>送信局</th><th>相手局（入力待ち）</th><th>報告時刻</th><th>操作</th></tr></thead><tbody id="tb2"></tbody></table></div>
+<div class="tbl-wrap"><table><thead><tr><th>バンド</th><th>送信局</th><th>相手局（入力待ち）</th><th>報告時刻</th><th>削除</th></tr></thead><tbody id="tb2"></tbody></table></div>
+
+<div class="past-box">
+  <label for="past-date" style="font-weight:bold;font-size:14px">📂 過去ログの表示切替:</label>
+  <select id="past-date" onchange="renderCurrent()"></select>
+</div>
 
 <script src="app.js"></script>
 </body>
