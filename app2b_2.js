@@ -6,18 +6,18 @@ function renderRest(stHist,canonName,allEdges,ow){
     hasRank=true;
     chains(bEdges).forEach(function(ch,i){
       var rk=i+1,col=PAL[i%PAL.length];
-      ch.ns.forEach(function(c){
-        var nk=normCall(c);
-        if(!sr[nk]||rk<sr[nk].rk)sr[nk]={rk:rk,band:bd,col:col};
+      ch.ns.forEach(function(nd){
+        var pts=nd.split("@"),cName=pts.shift(),pName=pts.join("@");
+        var key=normCall(cName)+"@"+pName;
+        if(!sr[key]||rk<sr[key].rk)sr[key]={rk:rk,band:bd,col:col};
       });
       ch.es.forEach(function(e){
         L.polyline([[e.A.lat,e.A.lon],[e.B.lat,e.B.lon]],{color:col,weight:5,opacity:0.9}).addTo(lg);
         L.tooltip({permanent:true,direction:"center"}).setLatLng([(e.A.lat+e.B.lat)/2,(e.A.lon+e.B.lon)/2]).setContent("["+bd+"] "+e.d.toFixed(1)+" km").addTo(lg);
       });
-      var rt=ch.ns.map(function(c){
-        var nk=normCall(c),list=stHist[nk];
-        var pl=list?list[list.length-1].place:"";
-        return"<b>"+c+"</b><small>("+pl+")</small>";
+      var rt=ch.ns.map(function(nd){
+        var pts=nd.split("@"),cName=pts.shift(),pName=pts.join("@");
+        return"<b>"+cName+"</b><small>("+pName+")</small>";
       }).join(" ➔ ");
       trK.innerHTML+="<tr><td><span class='b-tag'>"+bd+"</span></td><td><b>"+rk+"位</b></td><td><span class='c-bar' style='background:"+col+"'></span></td><td><b>"+ch.d.toFixed(1)+" km</b></td><td>"+rt+"</td></tr>";
     });
@@ -25,16 +25,19 @@ function renderRest(stHist,canonName,allEdges,ow){
   if(!hasRank)trK.innerHTML='<tr><td colspan="5" style="text-align:center;color:#64748b">ランキングデータがありません</td></tr>';
 
   Object.keys(stHist).forEach(function(nk){
-    var list=stHist[nk],moved=list.length>1,dispName=canonName[nk]||list[0].callsign;
-    var info=sr[nk],col=info?info.col:(moved?"#ea580c":"#0284c7");
+    var list=stHist[nk],moved=list.length>1,firstSt=list.slice(0,1).pop();
+    var dispName=canonName[nk]||firstSt.callsign;
     list.forEach(function(st,idx){
       var isLatest=(idx===list.length-1);
-      var mk=L.circleMarker([st.lat,st.lon],{radius:isLatest?8:6,fillColor:col,color:"#fff",weight:2,fillOpacity:isLatest?1:0.75})
-        .bindPopup("<b>"+dispName+"</b> ("+st.place+")"+(moved?"<br><span style='color:#ea580c'>[移動運用 "+(idx+1)+"箇所目]</span>":"")+(isLatest&&info?"<br>🏆 最高順位: <b>"+info.band+" "+info.rk+"位</b>":"")).addTo(lg);
-      if(isLatest){
-        var lblTxt=(info?info.rk+"位 ":"")+dispName;
-        var cls=moved?"move-lbl":(info?"rank-lbl":"");
-        if(cls)mk.bindTooltip(lblTxt,{permanent:true,direction:"top",offset:[0,-6],className:cls});
+      var locKey=nk+"@"+st.place;
+      var info=sr[locKey];
+      var col=info?info.col:(moved&&isLatest?"#ea580c":"#0284c7");
+      var mk=L.circleMarker([st.lat,st.lon],{radius:8,fillColor:col,color:"#fff",weight:2,fillOpacity:1})
+        .bindPopup("<b>"+dispName+"</b> ("+st.place+")"+(moved?"<br><span style='color:#ea580c'>[移動運用 "+(idx+1)+"箇所目]</span>":"")+(info?"<br>🏆 最高順位: <b>"+info.band+" "+info.rk+"位</b>":"")).addTo(lg);
+      if(info){
+        mk.bindTooltip(info.rk+"位 "+dispName,{permanent:true,direction:"top",offset:[0,-6],className:"rank-lbl"});
+      }else if(moved&&isLatest){
+        mk.bindTooltip(dispName,{permanent:true,direction:"top",offset:[0,-6],className:"move-lbl"});
       }
     });
   });
