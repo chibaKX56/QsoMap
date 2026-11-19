@@ -64,7 +64,13 @@ th{background:#f8fafc;color:#475569;font-weight:bold}
       <div class="fg"><label>4桁パスワード *</label><input id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="1234"></div>
     </div>
     <div class="fg"><label>運用場所名 *</label><input id="rp" placeholder="例: 月山山頂"></div>
-    <div class="fg"><label>座標 (緯度, 経度) *</label><input id="rx" placeholder="例: 38.5497, 140.0269"></div>
+        <div class="fg">
+      <label>座標 (緯度, 経度) *</label>
+      <div style="display:flex;gap:6px">
+        <input id="rx" placeholder="例: 38.5497, 140.0269" style="flex:1">
+        <button type="button" id="btn-gps" onclick="getGps()" style="width:auto;padding:0 12px;background:#475569;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;white-space:nowrap">📍 現在地</button>
+      </div>
+    </div>
     <button class="btn btn-blue" onclick="reg()">運用場所を登録・移動更新</button>
   </div>
   <div class="card">
