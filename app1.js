@@ -115,3 +115,17 @@ function dst(a,b,c,d){
   var r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;
   return 12742*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
+function getGps(){
+  if(!navigator.geolocation)return alert("お使いのブラウザはGPS取得に対応していません");
+  var btn=document.getElementById("btn-gps");
+  btn.textContent="取得中...";btn.disabled=true;
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var la=pos.coords.latitude.toFixed(6);
+    var lo=pos.coords.longitude.toFixed(6);
+    document.getElementById("rx").value=la+", "+lo;
+    btn.textContent="📍 現在地";btn.disabled=false;
+  },function(e){
+    btn.textContent="📍 現在地";btn.disabled=false;
+    alert("位置情報を取得できませんでした。スマホの位置情報（GPS）設定とブラウザの許可を確認してください。");
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:0});
+}
