@@ -3,16 +3,18 @@ var PAL=["#e11d48","#2563eb","#16a34a","#9333ea","#ea580c","#0891b2","#db2777","
 var BANDS=["CB","DCR","LCR","SLP"];
 var rawStations=[],rawLogs=[];
 
+function at(arr,i){return(arr&&arr.length>i)?arr.slice(i,i+1).pop():"";}
+
 function getDateStr(t){
   var s=String(t||""),m1=s.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-  if(m1)return m1[1]+"-"+("0"+m1[2]).slice(-2)+"-"+("0"+m1[3]).slice(-2);
+  if(m1)return at(m1,1)+"-"+("0"+at(m1,2)).slice(-2)+"-"+("0"+at(m1,3)).slice(-2);
   var d=new Date(s);
   if(!isNaN(d.getTime()))return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
   return "";
 }
 function fmtT(t){
   var s=String(t||""),mt=s.match(/(\d{1,2}):(\d{2})/);
-  if(mt)return("0"+mt[1]).slice(-2)+":"+mt[2];
+  if(mt)return("0"+at(mt,1)).slice(-2)+":"+at(mt,2);
   var d=new Date(s);
   return!isNaN(d.getTime())?("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2):s;
 }
@@ -65,7 +67,7 @@ function reg(){
   var pin=document.getElementById("pin").value.trim();
   var p=document.getElementById("rp").value.trim();
   var x=document.getElementById("rx").value.split(",");
-  var la=parseFloat(x[0]),lo=parseFloat(x[1]);
+  var la=parseFloat(x.shift()),lo=parseFloat(x.shift());
   if(!c||!p||isNaN(la)||isNaN(lo))return alert("コールサイン、運用場所、座標をすべて入力してください");
   if(!/^\d{4}$/.test(pin))return alert("4桁の数字パスワードを入力してください");
   localStorage.setItem("mc",c);localStorage.setItem("mp",pin);
