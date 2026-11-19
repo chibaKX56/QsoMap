@@ -6,7 +6,7 @@ function renderCurrent(){
 
 // 地図の初期化と外部データの読み込み
 m = L.map("map").setView([36.8,139.5],6);
-fetch("japan.json").then(function(r){return r.json();}).then(function(g){
+fetch("japan.geojson").then(function(r){return r.json();}).then(function(g){
   L.geoJSON(g,{style:{color:"#65a30d",weight:1,fillColor:"#ecfccb",fillOpacity:1},onEachFeature:function(f,l){var n=(f.properties&&(f.properties.nam_ja||f.properties.name))||"";if(n)l.bindTooltip(n,{sticky:true});}}).addTo(m).bringToBack();
 });
 lg = L.layerGroup().addTo(m);setTimeout(function(){m.invalidateSize();},400);
