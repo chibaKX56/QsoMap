@@ -27,14 +27,16 @@ function renderCurrent(){
     }
   });
 
-  function getPosAt(nk,qsoTime){
+   function getPosAt(nk,qsoTime){
     var list=stHist[nk];
     if(!list||!list.length)return null;
-    if(list.length===1)return list[0];
-    var qt=getTs(qsoTime),chosen=list[0];
+    var first=list.slice(0,1).pop();
+    if(list.length===1)return first;
+    var qt=getTs(qsoTime),chosen=first;
     for(var i=0;i<list.length;i++){
-      var stTs=getTs(list[i].date);
-      if(stTs<=qt)chosen=list[i];
+      var item=list.slice(i,i+1).pop();
+      var stTs=getTs(item.date);
+      if(stTs<=qt)chosen=item;
     }
     return chosen;
   }
