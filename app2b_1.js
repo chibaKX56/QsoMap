@@ -27,7 +27,7 @@ function renderCurrent(){
     }
   });
 
-   function getPosAt(nk,qsoTime){
+  function getPosAt(nk,qsoTime){
     var list=stHist[nk];
     if(!list||!list.length)return null;
     var first=list.slice(0,1).pop();
@@ -47,7 +47,8 @@ function renderCurrent(){
     if(A&&B){
       var d=dst(A.lat,A.lon,B.lat,B.lon);
       var dispA=canonName[p.nf]||A.callsign,dispB=canonName[p.nt]||B.callsign;
-      allEdges.push({u:dispA,v:dispB,nu:p.nf,nv:p.nt,d:d,A:A,B:B,band:p.band});
+      var nodeA=dispA+"@"+A.place,nodeB=dispB+"@"+B.place;
+      allEdges.push({u:nodeA,v:nodeB,d:d,A:A,B:B,band:p.band});
       var laterTime=getTs(p.b.time)>=getTs(p.a.time)?p.b.time:p.a.time;
       var linkA="<span class='del-link' onclick=\"delLog('"+p.a.id+"','"+p.a.from+"','"+p.a.to+"','"+p.a.time+"')\">"+dispA+"</span>";
       var linkB="<span class='del-link' onclick=\"delLog('"+p.b.id+"','"+p.b.from+"','"+p.b.to+"','"+p.b.time+"')\">"+dispB+"</span>";
