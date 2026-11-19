@@ -81,8 +81,9 @@ function reg(){
   if(!/^\d{4}$/.test(pin))return alert("4桁の数字パスワードを入力してください");
   localStorage.setItem("mc",c);localStorage.setItem("mp",pin);
   document.getElementById("st").textContent="登録中...";
-  var today=getToday();
-  var q="action=reg&call="+encodeURIComponent(c)+"&pin="+encodeURIComponent(pin)+"&place="+encodeURIComponent(p)+"&lat="+la+"&lon="+lo+"&date="+encodeURIComponent(today);
+  var nw=new Date();
+  var nowStr=getToday()+" "+("0"+nw.getHours()).slice(-2)+":"+("0"+nw.getMinutes()).slice(-2)+":"+("0"+nw.getSeconds()).slice(-2);
+  var q="action=reg&call="+encodeURIComponent(c)+"&pin="+encodeURIComponent(pin)+"&place="+encodeURIComponent(p)+"&lat="+la+"&lon="+lo+"&date="+encodeURIComponent(nowStr);
   gas(q,function(res){
     if(res&&res.status==="error"){alert(res.msg);document.getElementById("st").textContent="登録拒否";return;}
     alert("運用場所を登録しました");load();
