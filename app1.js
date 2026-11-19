@@ -5,6 +5,15 @@ var rawStations=[],rawLogs=[];
 
 function at(arr,i){return(arr&&arr.length>i)?arr.slice(i,i+1).pop():"";}
 
+// コールサイン正規化（ひらがな→カタカナ、全角英数→半角大文字、空白除去）
+function normCall(s){
+  return String(s||"").trim()
+    .replace(/[！-～]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);})
+    .replace(/[ぁ-ゖ]/g,function(c){return String.fromCharCode(c.charCodeAt(0)+0x60);})
+    .replace(/\s+/g,"")
+    .toUpperCase();
+}
+
 function getDateStr(t){
   var s=String(t||""),m1=s.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
   if(m1)return at(m1,1)+"-"+("0"+at(m1,2)).slice(-2)+"-"+("0"+at(m1,3)).slice(-2);
@@ -63,7 +72,7 @@ function load(){
   });
 }
 function reg(){
-  var c=document.getElementById("rc").value.trim().toUpperCase();
+  var c=document.getElementById("rc").value.trim();
   var pin=document.getElementById("pin").value.trim();
   var p=document.getElementById("rp").value.trim();
   var x=document.getElementById("rx").value.split(",");
@@ -80,11 +89,11 @@ function reg(){
   });
 }
 function qso(){
-  var mc=document.getElementById("rc").value.trim().toUpperCase();
-  var tc=document.getElementById("lt").value.trim().toUpperCase();
+  var mc=document.getElementById("rc").value.trim();
+  var tc=document.getElementById("lt").value.trim();
   var bd=document.getElementById("band").value;
   var tm=document.getElementById("tm").value.replace("T"," ");
-  if(!mc||!tc||!tm||mc===tc)return alert("自局・相手局コールサインと交信日時を確認してください");
+  if(!mc||!tc||!tm||normCall(mc)===normCall(tc))return alert("自局・相手局コールサインと交信日時を確認してください");
   localStorage.setItem("mc",mc);document.getElementById("st").textContent="送信中...";
   var q="action=qso&from="+encodeURIComponent(mc)+"&to="+encodeURIComponent(tc)+"&band="+encodeURIComponent(bd)+"&time="+encodeURIComponent(tm);
   gas(q,function(){document.getElementById("lt").value="";alert("送信完了しました");load();});
